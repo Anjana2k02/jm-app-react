@@ -41,6 +41,16 @@ Sign-up uses the project's email-confirmation policy. Where confirmation is enab
 
 The [storage setup script](supabase/storage.sql) creates a missing `doc-images` bucket and owner-scoped insert/select policies. Run it in your project's SQL editor if uploads fail because the bucket or policies are missing. It does not change an existing bucket's settings. A public bucket is required for the image URLs used by both clients.
 
+## Deploy to Netlify
+
+The repository's `.nvmrc` and `netlify.toml` select Node.js 22, run `npm run build`, and publish `dist`. Keep the base directory at the repository root. Node.js 18 is not supported by the installed Vite and Supabase dependencies.
+
+In Netlify's environment variables, set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` (or `SUPABASE_ANON_KEY`) to the project's public browser configuration. Set `VITE_WORKSPACE_MODE=cloud`. These values are intentionally included in the browser bundle; leave **Contains secret values** unchecked when creating them. Never use a server secret or service-role key.
+
+If these public settings were already marked as secrets, recreate them without the secret flag, or set `SECRETS_SCAN_OMIT_KEYS` to only the public variable names reported by the scan. Keep secret scanning enabled for other values. Environment changes require a new deployment.
+
+After pushing configuration changes, trigger a new production deployment. If it fails, inspect the complete deploy log: a secret-scanning failure is separate from a dependency installation or compilation error.
+
 ## Features
 
 - Responsive dashboard, library, recent documents, counts, and upcoming sessions.
