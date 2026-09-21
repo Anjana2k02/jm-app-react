@@ -65,8 +65,8 @@ export function Empty({
   description,
   children,
 }: {
-  title: string;
-  description: string;
+  title?: string;
+  description?: string;
   children?: ReactNode;
 }) {
   return (
@@ -74,8 +74,8 @@ export function Empty({
       <span className="empty-icon">
         <Music2 size={30} />
       </span>
-      <h2>{title}</h2>
-      <p>{description}</p>
+      {title && <h2>{title}</h2>}
+      {description && <p>{description}</p>}
       {children}
     </div>
   );

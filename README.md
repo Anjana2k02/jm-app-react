@@ -72,6 +72,24 @@ The Settings page also includes these instructions. The install button appears o
 
 The editable logo is `public/icons/logo.svg`. After changing it, run `node scripts/generate-icons.mjs` with Google Chrome installed to regenerate the committed PNG icons. See [MDN's installation guide](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable) and [Apple's home-screen instructions](https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/ios).
 
+## Session gestures and admin permissions
+
+Session song cards have no delete button or drag handle. Admins can swipe a card left to remove it **from that session only**, with an **Undo** action, or hold the card for one second before dragging it to a new position. Short swipes and normal vertical scrolling do not remove songs. Keyboard users can focus a card and press Ctrl+Up/Down to reorder or Delete to remove it. Regular cloud users can select songs, navigate the session, and use Live Mode; adding, removing, and reordering session songs are admin-only.
+
+Cloud admin access uses the protected Supabase `app_metadata.role` field with the exact value `admin`. Missing roles and all other values are regular users. User-editable `user_metadata` is never used for authorization. The explicitly selected local-only workspace has no accounts or roles; its single device owner retains editing access. Use `WORKSPACE_MODE=cloud` for shared deployments with role enforcement.
+
+Before deploying this feature, run [supabase/session-admin.sql](supabase/session-admin.sql) in your Supabase SQL editor. It adds restrictive write policies alongside existing read policies and checks protected account metadata on every database request. A trigger also prevents regular users from bypassing permissions through cascading deletion of a parent document or session. Trusted SQL-editor and service-role maintenance remains possible. The frontend additionally checks permissions before setlist mutations and rechecks the current user before submitting queued setlist writes. The SQL migration is required for security against direct API requests; deploying the frontend alone does not install database policies.
+
+Assign the role to each intended administrator through a trusted Supabase admin workflow. For example, replace the UUID below and run this in the SQL editor (never in browser code):
+
+```sql
+update auth.users
+set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role":"admin"}'::jsonb
+where id = 'REPLACE-WITH-ADMIN-USER-UUID'::uuid;
+```
+
+Sign out and sign back in after assigning a role so the app receives the updated metadata. The migration does not automatically promote any account. See [Supabase's authorization guidance](https://supabase.com/docs/guides/database/postgres/row-level-security).
+
 ## Features
 
 - Responsive dashboard, library, recent documents, counts, and upcoming sessions.
@@ -85,7 +103,7 @@ The editable logo is `public/icons/logo.svg`. After changing it, run `node scrip
 - Create/edit/delete dated sessions with notes; searchable multi-select song picker prevents duplicates; remove songs and persist setlist ordering.
 - Focused read-only session viewer with Previous/Next boundaries, song count, independently scrolling content, a 60% desktop song panel, collapsed rail, and mobile drawer.
 - **Live Mode** beside the session name fills the screen with the song, Previous/Next controls, and the next song title at the top right. Double-tap (or double-click) the song area to exit or enter again; Escape also exits. The selected song, scroll position, and setlist panel state are preserved when toggling. Browsers without native fullscreen support use a full-window view; installed home-screen apps already run in their own window. See [Fullscreen API support](https://developer.mozilla.org/en-US/docs/Web/API/Element/requestFullscreen).
-- Mouse, touch, and keyboard reordering. Drag the grip; on touch, hold the grip briefly. Keyboard: Space then arrows and Space to drop, or Ctrl+Up/Down on the grip. Reordering preserves the selected song.
+- Admin-only session song gestures: swipe left to remove with Undo, hold one second to reorder, or use Ctrl+Up/Down and Delete on a focused song card. Reordering preserves the selected song. Template lists retain their existing drag grips and keyboard controls.
 - Light/dark/system appearance, native modal focus management and Escape dismissal, reduced-motion styling.
 - Queued cloud writes, visible failure/retry state, durable unsynced operations recovered on reload, and unload protection while saves are pending. Initial load failures block edits instead of displaying a misleading empty workspace.
 

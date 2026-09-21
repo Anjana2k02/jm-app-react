@@ -1125,6 +1125,30 @@ input[type='checkbox'] {
   font-size: 10px;
   gap: 8px;
 }
+.session-badge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.session-badge.upcoming {
+  color: #5147b3;
+  background: #efedf9;
+}
+.session-badge.completed {
+  color: #1e9e58;
+  background: #e6f6ec;
+}
+:root[data-theme='dark'] .session-badge.upcoming {
+  color: #b7abef;
+  background: rgba(137, 118, 213, 0.18);
+}
+:root[data-theme='dark'] .session-badge.completed {
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.15);
+}
 .search-page {
   max-width: 1000px;
   width: 100%;
@@ -1309,6 +1333,68 @@ input[type='checkbox'] {
 .song-cards {
   overflow: auto;
   flex: 1;
+}
+.session-gesture-help {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+  margin: -12px 0 18px;
+}
+.session-undo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--soft);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+.session-undo span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.session-song-row {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.session-song-row.dragging {
+  z-index: 5;
+  box-shadow: 0 12px 30px #28224155;
+  outline: 2px solid #9a86d7;
+}
+.session-song-row .song-card {
+  position: relative;
+  padding-right: 0;
+}
+.session-song-row .song-select {
+  min-height: 88px;
+  touch-action: pan-y;
+}
+.session-song-row .gesture-enabled {
+  user-select: none;
+  -webkit-touch-callout: none;
+  cursor: grab;
+}
+.session-song-row.dragging .song-select {
+  cursor: grabbing;
+}
+.swipe-remove {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 16px;
+  background: #782f3c;
+  color: white;
+  font-size: 11px;
+  font-weight: 650;
+}
+.swipe-remove.ready {
+  background: #b4233c;
 }
 .song-card {
   display: flex;

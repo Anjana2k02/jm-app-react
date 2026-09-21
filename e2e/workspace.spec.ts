@@ -71,7 +71,7 @@ test('document editing, smart paste, templates, sessions, search, and persistenc
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(page.locator('.song-content h1')).toHaveText('Evening Song');
   await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeDisabled();
-  await page.getByRole('button', { name: 'Reorder song', exact: true }).nth(1).focus();
+  await page.locator('.song-select').nth(1).focus();
   await page.keyboard.press('Control+ArrowUp');
   await expect(page.locator('.song-content h1')).toHaveText('Evening Song');
   await expect(page.getByRole('button', { name: 'Previous', exact: true })).toBeDisabled();

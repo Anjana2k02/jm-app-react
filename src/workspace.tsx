@@ -10,7 +10,7 @@ import {
 } from './model';
 import { loadData, localKey, remove, supabase, upsert, errorMessage } from './backend';
 import { write, erase, replay, type Job } from './operations';
-function useWorkspaceState(userId: string) {
+function useWorkspaceState(userId: string, canManageSessionSongs: boolean) {
   const [data, setData] = useState<Data>(emptyData),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(''),
@@ -156,6 +156,10 @@ function useWorkspaceState(userId: string) {
   }
   function deleteDocument(id: string) {
     const d = current.current;
+    if (!canManageSessionSongs && d.session_songs.some((song) => song.document_id === id)) {
+      setError('Only admins can remove songs that belong to a session.');
+      return;
+    }
     commit(
       {
         ...d,
@@ -238,6 +242,10 @@ function useWorkspaceState(userId: string) {
   }
   function deleteSession(id: string) {
     const d = current.current;
+    if (!canManageSessionSongs && d.session_songs.some((song) => song.session_id === id)) {
+      setError('Only admins can delete a session containing songs.');
+      return;
+    }
     commit(
       {
         ...d,
@@ -248,6 +256,10 @@ function useWorkspaceState(userId: string) {
     );
   }
   function setOrder(kind: 'template' | 'session', id: string, ids: string[]) {
+    if (kind === 'session' && !canManageSessionSongs) {
+      setError('Only admins can change the songs in a session.');
+      return;
+    }
     const table = kind === 'template' ? 'template_items' : 'session_songs',
       column = kind === 'template' ? 'template_id' : 'session_id';
     const rows: Item[] = [...new Set(ids)].map((document_id, sort_order) => ({
@@ -296,6 +308,7 @@ function useWorkspaceState(userId: string) {
     error,
     pending,
     userId,
+    canManageSessionSongs,
     load,
     retry: drain,
     createDocument,
@@ -312,8 +325,16 @@ function useWorkspaceState(userId: string) {
   };
 }
 const Context = createContext<ReturnType<typeof useWorkspaceState> | null>(null);
-export function WorkspaceProvider({ userId, children }: { userId: string; children: ReactNode }) {
-  const value = useWorkspaceState(userId);
+export function WorkspaceProvider({
+  userId,
+  canManageSessionSongs = false,
+  children,
+}: {
+  userId: string;
+  canManageSessionSongs?: boolean;
+  children: ReactNode;
+}) {
+  const value = useWorkspaceState(userId, canManageSessionSongs);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 export function useWorkspace() {

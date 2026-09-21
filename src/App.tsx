@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import {
   Home,
-  FileText,
+  ListMusic,
   CalendarDays,
   Layers,
   Search,
@@ -23,7 +23,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
-import { supabase, configError } from './backend';
+import { supabase, configError, localMode } from './backend';
 import { WorkspaceProvider, useWorkspace } from './workspace';
 import { Empty, Modal, SortableList, dateLabel } from './components';
 import { Editor } from './Editor';
@@ -96,7 +96,11 @@ export default function App() {
   if (loading) return <div className="loading">Opening your workspace…</div>;
   if (supabase && !user) return <Auth initialError={authError} />;
   return (
-    <WorkspaceProvider key={user?.id ?? 'local'} userId={user?.id ?? 'local'}>
+    <WorkspaceProvider
+      key={user?.id ?? 'local'}
+      userId={user?.id ?? 'local'}
+      canManageSessionSongs={localMode || user?.app_metadata?.role === 'admin'}
+    >
       <Workspace email={user?.email ?? 'Local workspace'} installation={installation} />
     </WorkspaceProvider>
   );
@@ -257,16 +261,25 @@ function Workspace({
     session = ws.data.sessions.find((s) => s.id === route.id);
   const now = new Date(),
     today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const sessions = [...ws.data.sessions].sort((a, b) =>
-    (a.session_date ?? '9999').localeCompare(b.session_date ?? '9999'),
-  );
+  const sessions = [...ws.data.sessions].sort((a, b) => {
+    if (!a.session_date || !b.session_date)
+      return Number(!a.session_date) - Number(!b.session_date);
+    const aUpcoming = a.session_date >= today,
+      bUpcoming = b.session_date >= today;
+    if (aUpcoming !== bUpcoming) return aUpcoming ? -1 : 1;
+    return aUpcoming
+      ? a.session_date.localeCompare(b.session_date)
+      : b.session_date.localeCompare(a.session_date);
+  });
+  const daysUntil = (date: string) =>
+    Math.round((Date.parse(`${date}T12:00:00`) - Date.parse(`${today}T12:00:00`)) / 86400000);
   const upcoming = sessions.filter((s) => s.session_date && s.session_date >= today),
     recent = [...ws.data.documents]
       .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
       .slice(0, 5);
   const nav = [
     { id: 'home', label: 'Home', icon: Home },
-    { id: 'documents', label: 'Documents', icon: FileText },
+    { id: 'documents', label: 'Songs', icon: ListMusic },
     { id: 'sessions', label: 'Sessions', icon: CalendarDays },
     { id: 'templates', label: 'Templates', icon: Layers },
     { id: 'search', label: 'Search', icon: Search },
@@ -292,7 +305,7 @@ function Workspace({
     items.map((d) => (
       <button className="document-row" key={d.id} onClick={() => navigate('documents', d.id)}>
         <span className="document-icon">
-          <FileText size={20} />
+          <Music2 size={20} />
         </span>
         <span className="row-copy">
           <strong>{d.title || 'Untitled'}</strong>
@@ -445,7 +458,7 @@ function Workspace({
                     {
                       title: 'Documents',
                       count: ws.data.documents.length,
-                      icon: FileText,
+                      icon: Music2,
                       color: 'indigo',
                       detail: 'Songs & ideas',
                     },
@@ -492,7 +505,7 @@ function Workspace({
                         {
                           title: 'Documents',
                           text: 'Bring your lyrics and chords together.',
-                          icon: FileText,
+                          icon: Music2,
                           color: 'indigo',
                         },
                         {
@@ -633,12 +646,12 @@ function Workspace({
                 <aside className="document-panel">
                   <div className="section-heading">
                     <h2>
-                      Documents <span className="count">{ws.data.documents.length}</span>
+                      Songs <span className="count">{ws.data.documents.length}</span>
                     </h2>
                     <button
                       className="icon-button"
                       onClick={() => openCreate('document')}
-                      aria-label="New document"
+                      aria-label="New song"
                     >
                       <Plus size={21} />
                     </button>
@@ -650,7 +663,7 @@ function Workspace({
                       value={templateId}
                       onChange={(e) => setTemplateId(e.target.value)}
                     >
-                      <option value="">All documents</option>
+                      <option value="">All songs</option>
                       {ws.data.templates.map((t) => (
                         <option key={t.id} value={t.id}>
                           {t.name}
@@ -661,8 +674,8 @@ function Workspace({
                   <div className="search-field">
                     <Search size={16} />
                     <input
-                      aria-label="Filter documents"
-                      placeholder="Find a document…"
+                      aria-label="Filter songs"
+                      placeholder="Search…"
                       value={docQuery}
                       onChange={(e) => setDocQuery(e.target.value)}
                     />
@@ -680,7 +693,7 @@ function Workspace({
                               className={`doc-nav ${route.id === id ? 'selected' : ''}`}
                               onClick={() => navigate('documents', id)}
                             >
-                              <FileText size={17} />
+                              <Music2 size={17} />
                               <span>{d.title || 'Untitled'}</span>
                             </button>
                           );
@@ -693,19 +706,20 @@ function Workspace({
                           className={`doc-nav ${route.id === d.id ? 'selected' : ''}`}
                           onClick={() => navigate('documents', d.id)}
                         >
-                          <FileText size={17} />
+                          <Music2 size={17} />
                           <span>{d.title || 'Untitled'}</span>
                         </button>
                       ))
                     )}
-                    {!docs.length && (
-                      <p className="muted panel-hint">
-                        {docQuery ? 'No matching documents.' : 'Your songs will appear here.'}
-                      </p>
-                    )}
+                    {!docs.length && docQuery && <p className="muted panel-hint">No matches.</p>}
                   </div>
-                  <button className="button secondary" onClick={() => openCreate('template')}>
-                    <Layers size={17} /> New template
+                  <button
+                    className="button secondary"
+                    onClick={() => openCreate('template')}
+                    aria-label="New template"
+                    title="New template"
+                  >
+                    <Layers size={17} /> <Plus size={15} />
                   </button>
                 </aside>
                 {selected ? (
@@ -720,12 +734,13 @@ function Workspace({
                   />
                 ) : (
                   <div className="editor-placeholder">
-                    <Empty
-                      title="A home for every song"
-                      description="Choose a document, or start with a fresh page."
-                    >
-                      <button className="button" onClick={() => openCreate('document')}>
-                        <Plus size={18} /> New document
+                    <Empty>
+                      <button
+                        className="button"
+                        onClick={() => openCreate('document')}
+                        aria-label="New song"
+                      >
+                        <Plus size={18} />
                       </button>
                     </Empty>
                   </div>
@@ -735,13 +750,13 @@ function Workspace({
             {route.page === 'sessions' && (
               <main className="page">
                 <div className="page-heading">
-                  <div>
-                    <span className="eyebrow">GET TOGETHER. PLAY SOMETHING.</span>
-                    <h1>Sessions</h1>
-                    <p>Plan a rehearsal, build a setlist, and stay in the music.</p>
-                  </div>
-                  <button className="button" onClick={() => setSessionForm('new')}>
-                    <Plus size={18} /> Create session
+                  <h1>Sessions</h1>
+                  <button
+                    className="button"
+                    onClick={() => setSessionForm('new')}
+                    aria-label="New session"
+                  >
+                    <Plus size={18} />
                   </button>
                 </div>
                 {sessions.length ? (
@@ -771,9 +786,21 @@ function Workspace({
                           <h2>{s.name}</h2>
                           <ArrowUpRight size={20} />
                         </button>
-                        <p>{s.notes || 'A little space to play together.'}</p>
+                        {s.notes && <p>{s.notes}</p>}
                         <div className="card-meta">
-                          <span>{dateLabel(s.session_date)}</span>
+                          <span>
+                            {dateLabel(s.session_date)}
+                            {s.session_date &&
+                              (s.session_date >= today ? (
+                                <span className="session-badge upcoming">
+                                  {daysUntil(s.session_date) === 0
+                                    ? 'Today'
+                                    : `${daysUntil(s.session_date)} ${daysUntil(s.session_date) === 1 ? 'day' : 'days'} left`}
+                                </span>
+                              ) : (
+                                <span className="session-badge completed">Completed</span>
+                              ))}
+                          </span>
                           <span>
                             {ws.data.session_songs.filter((i) => i.session_id === s.id).length}{' '}
                             songs
@@ -783,12 +810,13 @@ function Workspace({
                     ))}
                   </div>
                 ) : (
-                  <Empty
-                    title="Make your next session a good one"
-                    description="Create a session and bring your songs together."
-                  >
-                    <button className="button" onClick={() => setSessionForm('new')}>
-                      Create session
+                  <Empty>
+                    <button
+                      className="button"
+                      onClick={() => setSessionForm('new')}
+                      aria-label="New session"
+                    >
+                      <Plus size={18} />
                     </button>
                   </Empty>
                 )}
@@ -1140,7 +1168,7 @@ function SearchResults({
           <button className="document-row" key={`${r.type}-${r.id}`} onClick={r.open}>
             <span className="document-icon">
               {r.type === 'Document' ? (
-                <FileText size={20} />
+                <Music2 size={20} />
               ) : r.type === 'Session' ? (
                 <CalendarDays size={20} />
               ) : (

@@ -5,7 +5,7 @@ test('cloud authentication, failed save recovery after reload, and sign out', as
     aud: 'authenticated',
     role: 'authenticated',
     email: 'musician@example.test',
-    app_metadata: { provider: 'email' },
+    app_metadata: { provider: 'email', role: 'admin' },
     user_metadata: {},
     created_at: new Date().toISOString(),
   };
@@ -128,7 +128,8 @@ test('cloud authentication, failed save recovery after reload, and sign out', as
         'POST /rest/v1/session_songs',
       ]),
     );
-  await page.getByRole('button', { name: 'Remove Cloud Song from session' }).click();
+  await page.locator('.song-select').focus();
+  await page.keyboard.press('Delete');
   await expect.poll(() => writes).toContain('DELETE /rest/v1/session_songs');
   await page.getByRole('button', { name: 'Back', exact: true }).click();
   await page.locator('.sidebar').getByRole('button', { name: 'Settings' }).click();

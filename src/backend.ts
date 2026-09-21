@@ -45,16 +45,24 @@ export async function loadData(): Promise<Data> {
 export async function upsert(table: keyof Data, rows: unknown[]) {
   requireBackend();
   if (!supabase || !rows.length) return;
+  if (table === 'session_songs') await requireSessionAdmin();
   const { error } = await supabase.from(table).upsert(rows);
   if (error) throw new Error(`Could not save ${table}: ${errorMessage(error)}`);
 }
 export async function remove(table: keyof Data, column: string, id: string, documentId?: string) {
   requireBackend();
   if (!supabase) return;
+  if (table === 'session_songs') await requireSessionAdmin();
   let query = supabase.from(table).delete().eq(column, id);
   if (documentId) query = query.eq('document_id', documentId);
   const { error } = await query;
   if (error) throw new Error(`Could not delete from ${table}: ${errorMessage(error)}`);
+}
+async function requireSessionAdmin() {
+  const { data, error } = await supabase!.auth.getUser();
+  if (error) throw error;
+  if (data.user?.app_metadata?.role !== 'admin')
+    throw new Error('Only admins can change the songs in a session.');
 }
 export async function uploadImage(file: File, userId: string) {
   requireBackend();

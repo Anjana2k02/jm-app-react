@@ -6,11 +6,11 @@ import {
   PanelLeftOpen,
   Plus,
   Search,
-  X,
   Maximize,
 } from 'lucide-react';
 import { useWorkspace } from './workspace';
-import { Empty, Modal, SortableList, dateLabel } from './components';
+import { Empty, Modal } from './components';
+import { SessionSongList } from './SessionSongList';
 import { RichViewer } from './Editor';
 import type { Session } from './model';
 import { useLiveMode } from './useLiveMode';
@@ -81,6 +81,12 @@ export function SessionDetail({ session, onBack }: { session: Session; onBack: (
     [adding, setAdding] = useState(false),
     [query, setQuery] = useState(''),
     [checked, setChecked] = useState<string[]>([]);
+  const [removed, setRemoved] = useState<{
+    id: string;
+    index: number;
+    title: string;
+    selected: boolean;
+  } | null>(null);
   const ids = ws.data.session_songs
     .filter((i) => i.session_id === session.id)
     .sort((a, b) => a.sort_order - b.sort_order)
@@ -94,6 +100,24 @@ export function SessionDetail({ session, onBack }: { session: Session; onBack: (
   function select(id: string) {
     setSelected(id);
     if (window.innerWidth < 760) setCollapsed(true);
+  }
+  function removeSong(id: string) {
+    if (!ws.canManageSessionSongs) return;
+    const position = ids.indexOf(id);
+    const song = ws.data.documents.find((item) => item.id === id);
+    if (position < 0 || !song) return;
+    setRemoved({
+      id,
+      index: position,
+      title: song.title || 'Untitled',
+      selected: id === selectedId,
+    });
+    if (id === selectedId) setSelected(ids[position + 1] ?? ids[position - 1] ?? null);
+    ws.setOrder(
+      'session',
+      session.id,
+      ids.filter((item) => item !== id),
+    );
   }
   return (
     <div ref={root} className={`session-detail ${live ? 'live-mode' : ''}`}>
@@ -132,12 +156,9 @@ export function SessionDetail({ session, onBack }: { session: Session; onBack: (
           ) : (
             <>
               <div className="section-heading">
-                <div>
-                  <h2>
-                    Setlist <span className="count">{ids.length}</span>
-                  </h2>
-                  <p className="muted">Your songs, in your order.</p>
-                </div>
+                <h2>
+                  Setlist <span className="count">{ids.length}</span>
+                </h2>
                 <button
                   className="icon-button"
                   onClick={() => setCollapsed(true)}
@@ -146,59 +167,61 @@ export function SessionDetail({ session, onBack }: { session: Session; onBack: (
                   <PanelLeftClose size={22} />
                 </button>
               </div>
-              <button
-                className="button"
-                onClick={() => {
-                  setChecked([]);
-                  setQuery('');
-                  setAdding(true);
-                }}
-              >
-                <Plus size={18} /> Add songs
-              </button>
+              {ws.canManageSessionSongs && (
+                <button
+                  className="button"
+                  onClick={() => {
+                    setChecked([]);
+                    setQuery('');
+                    setAdding(true);
+                  }}
+                  aria-label="Add songs"
+                >
+                  <Plus size={18} />
+                </button>
+              )}
+              {ws.canManageSessionSongs && (
+                <p id="session-gesture-help" className="session-gesture-help">
+                  Swipe left to remove · Hold 1 sec to move
+                </p>
+              )}
+              {removed && ws.canManageSessionSongs && (
+                <div className="session-undo" role="status">
+                  <span>Removed {removed.title} from this session.</span>
+                  <button
+                    className="text-button"
+                    onClick={() => {
+                      if (
+                        !ids.includes(removed.id) &&
+                        ws.data.documents.some((song) => song.id === removed.id)
+                      ) {
+                        const order = [...ids];
+                        order.splice(Math.min(removed.index, order.length), 0, removed.id);
+                        ws.setOrder('session', session.id, order);
+                        if (removed.selected) setSelected(removed.id);
+                      }
+                      setRemoved(null);
+                    }}
+                  >
+                    Undo
+                  </button>
+                </div>
+              )}
               <div className="song-cards">
                 {ids.length ? (
-                  <SortableList
-                    ids={ids}
-                    onReorder={(order) => ws.setOrder('session', session.id, order)}
-                  >
-                    {(id, i) => {
-                      const song = ws.data.documents.find((d) => d.id === id)!;
-                      return (
-                        <div className={`song-card ${selectedId === id ? 'active' : ''}`}>
-                          <button
-                            className="song-select"
-                            onClick={() => select(id)}
-                            aria-current={selectedId === id ? 'true' : undefined}
-                          >
-                            <span className="song-number">{String(i + 1).padStart(2, '0')}</span>
-                            <span>
-                              <strong>{song.title || 'Untitled'}</strong>
-                              <small>Updated {dateLabel(song.updated_at)}</small>
-                            </span>
-                          </button>
-                          <button
-                            className="icon-button"
-                            aria-label={`Remove ${song.title} from session`}
-                            onClick={() =>
-                              ws.setOrder(
-                                'session',
-                                session.id,
-                                ids.filter((x) => x !== id),
-                              )
-                            }
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      );
+                  <SessionSongList
+                    songs={ids.map((id) => ws.data.documents.find((song) => song.id === id)!)}
+                    selectedId={selectedId}
+                    canEdit={ws.canManageSessionSongs}
+                    onSelect={select}
+                    onRemove={removeSong}
+                    onReorder={(order) => {
+                      setSelected(selectedId ?? null);
+                      ws.setOrder('session', session.id, order);
                     }}
-                  </SortableList>
-                ) : (
-                  <Empty
-                    title="Build your setlist"
-                    description="Add songs from your document library to get started."
                   />
+                ) : (
+                  <Empty />
                 )}
               </div>
             </>
@@ -230,32 +253,30 @@ export function SessionDetail({ session, onBack }: { session: Session; onBack: (
           </div>
           {doc ? (
             <div className="song-content" key={doc.id}>
-              <span className="eyebrow">SONG {String(index + 1).padStart(2, '0')}</span>
               <h1>{doc.title || 'Untitled'}</h1>
               <RichViewer doc={doc} />
             </div>
           ) : (
-            <Empty
-              title="Ready when you are"
-              description="Add a song to this session to open the focused viewer."
-            >
-              <button
-                className="button"
-                onClick={() => {
-                  setChecked([]);
-                  setQuery('');
-                  setAdding(true);
-                }}
-              >
-                <Plus size={18} /> Add songs
-              </button>
+            <Empty>
+              {ws.canManageSessionSongs && (
+                <button
+                  className="button"
+                  onClick={() => {
+                    setChecked([]);
+                    setQuery('');
+                    setAdding(true);
+                  }}
+                  aria-label="Add songs"
+                >
+                  <Plus size={18} />
+                </button>
+              )}
             </Empty>
           )}
         </main>
       </div>
-      {adding && (
+      {adding && ws.canManageSessionSongs && (
         <Modal title="Add songs" onClose={() => setAdding(false)}>
-          <p>Select songs from your library for this session.</p>
           <div className="search-field">
             <Search size={18} />
             <input
