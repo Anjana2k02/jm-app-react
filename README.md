@@ -51,6 +51,17 @@ If these public settings were already marked as secrets, recreate them without t
 
 After pushing configuration changes, trigger a new production deployment. If it fails, inspect the complete deploy log: a secret-scanning failure is separate from a dependency installation or compilation error.
 
+## Add to your phone's home screen
+
+Deploy the latest build to your HTTPS Netlify address, then open that address on your phone. The app includes a web app manifest, a purple music-note logo, Android icons (including a maskable icon), and an Apple touch icon. Home-screen launches open in a standalone app window.
+
+- **Android / Chrome:** open **Settings** in Jammer Docs and tap **Install Jammer Docs** when offered. Alternatively, use Chrome's menu → **Add to Home screen** / **Install app**.
+- **iPhone / iPad:** open the site in Safari, tap **Share** → **Add to Home Screen**, leave **Open as Web App** enabled if shown, then tap **Add**.
+
+The Settings page also includes these instructions. The install button appears only when the browser offers an installation prompt. Installation requires HTTPS (localhost works for development; a plain HTTP LAN address does not satisfy the install requirement). Opening the app and cloud sync still require an internet connection; no offline caching is added. Sign in with the same cloud account to access your existing workspace; local-only browser data does not transfer between devices.
+
+The editable logo is `public/icons/logo.svg`. After changing it, run `node scripts/generate-icons.mjs` with Google Chrome installed to regenerate the committed PNG icons. See [MDN's installation guide](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable) and [Apple's home-screen instructions](https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/ios).
+
 ## Features
 
 - Responsive dashboard, library, recent documents, counts, and upcoming sessions.

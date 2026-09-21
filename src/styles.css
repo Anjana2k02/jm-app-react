@@ -335,6 +335,9 @@ input[type='checkbox'] {
 .brand-light {
   font-weight: 450;
 }
+.brand-icon img {
+  display: block;
+}
 .app-shell {
   display: flex;
   height: 100dvh;
@@ -1152,6 +1155,20 @@ input[type='checkbox'] {
 .settings-card p {
   margin: 15px 0;
 }
+.install-app-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.install-app-heading img {
+  flex-shrink: 0;
+}
+.install-app-heading h2 {
+  margin-bottom: 5px;
+}
+.install-instructions {
+  line-height: 1.7;
+}
 .theme-options {
   display: flex;
   gap: 10px;
@@ -1724,7 +1741,7 @@ dialog textarea {
     padding: 0 16px;
   }
   .app-shell {
-    padding-bottom: 66px;
+    padding-bottom: calc(66px + env(safe-area-inset-bottom));
   }
   .mobile-bottom {
     display: flex;
@@ -1733,7 +1750,7 @@ dialog textarea {
     left: 0;
     right: 0;
     z-index: 20;
-    height: 66px;
+    height: calc(66px + env(safe-area-inset-bottom));
     background: var(--surface);
     border-top: 1px solid var(--border);
     padding-bottom: env(safe-area-inset-bottom);

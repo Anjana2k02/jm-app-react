@@ -30,6 +30,7 @@ import { Editor } from './Editor';
 import { SessionDetail, SessionForm } from './Sessions';
 import { plainText, type Session } from './model';
 import { ConnectionStatus } from './ConnectionStatus';
+import { InstallApp, useAppInstallation } from './InstallApp';
 type Route = { page: string; id?: string };
 function readRoute(): Route {
   const [page, id] = location.hash.slice(1).split('/');
@@ -39,6 +40,7 @@ function navigate(page: string, id?: string) {
   location.hash = `${page}${id ? `/${id}` : ''}`;
 }
 export default function App() {
+  const installation = useAppInstallation();
   const [user, setUser] = useState<User | null>(null),
     [loading, setLoading] = useState(Boolean(supabase)),
     [authError, setAuthError] = useState('');
@@ -95,7 +97,7 @@ export default function App() {
   if (supabase && !user) return <Auth initialError={authError} />;
   return (
     <WorkspaceProvider key={user?.id ?? 'local'} userId={user?.id ?? 'local'}>
-      <Workspace email={user?.email ?? 'Local workspace'} />
+      <Workspace email={user?.email ?? 'Local workspace'} installation={installation} />
     </WorkspaceProvider>
   );
 }
@@ -103,7 +105,7 @@ function Logo() {
   return (
     <div className="brand">
       <span className="brand-icon">
-        <Music2 size={23} />
+        <img src={`${import.meta.env.BASE_URL}icons/logo.svg`} width="34" height="34" alt="" />
       </span>
       <span>
         Jammer<span className="brand-light"> Docs</span>
@@ -205,7 +207,13 @@ function Auth({ initialError }: { initialError: string }) {
     </div>
   );
 }
-function Workspace({ email }: { email: string }) {
+function Workspace({
+  email,
+  installation,
+}: {
+  email: string;
+  installation: ReturnType<typeof useAppInstallation>;
+}) {
   const ws = useWorkspace(),
     [route, setRoute] = useState(readRoute),
     [mobileNav, setMobileNav] = useState(false),
@@ -907,6 +915,7 @@ function Workspace({ email }: { email: string }) {
                   </button>
                 </section>
                 {supabase && <ConnectionStatus />}
+                <InstallApp installation={installation} />
                 <section className="settings-card">
                   <h2>Appearance</h2>
                   <div className="theme-options">
