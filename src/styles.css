@@ -411,6 +411,11 @@ input[type='checkbox'] {
   filter: drop-shadow(0 1px 1px #0002);
   pointer-events: none;
 }
+.avatar.small .admin-crown {
+  width: 15px;
+  height: 15px;
+  top: -11px;
+}
 .nav-label {
   font-size: 8px;
   letter-spacing: 1.5px;
