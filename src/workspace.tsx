@@ -7,6 +7,7 @@ import {
   type Item,
   type Op,
   type Session,
+  type SongType,
 } from './model';
 import { loadData, localKey, remove, supabase, upsert, errorMessage } from './backend';
 import { write, erase, replay, type Job } from './operations';
@@ -127,12 +128,14 @@ function useWorkspaceState(userId: string, canManageSessionSongs: boolean) {
     return () => window.removeEventListener('beforeunload', guard);
   }, []);
   const stamp = () => new Date().toISOString();
-  function createDocument(title: string) {
+  function createDocument(title: string, song_type: SongType = 'song', artist = '') {
     const doc: Doc = {
       id: crypto.randomUUID(),
       user_id: userId,
       title: title.trim(),
       content: [{ insert: '\n' }],
+      song_type,
+      artist: artist.trim() || null,
       created_at: stamp(),
       updated_at: stamp(),
     };

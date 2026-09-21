@@ -21,14 +21,23 @@ import {
   Monitor,
   Eye,
   EyeOff,
+  Crown,
 } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
 import { supabase, configError, localMode } from './backend';
 import { WorkspaceProvider, useWorkspace } from './workspace';
-import { Empty, Modal, SortableList, dateLabel } from './components';
+import {
+  Empty,
+  Modal,
+  SortableList,
+  dateLabel,
+  SONG_TYPES,
+  songTypeMeta,
+  TypeIcon,
+} from './components';
 import { Editor } from './Editor';
 import { SessionDetail, SessionForm } from './Sessions';
-import { plainText, type Session } from './model';
+import { plainText, type Session, type SongType } from './model';
 import { ConnectionStatus } from './ConnectionStatus';
 import { InstallApp, useAppInstallation } from './InstallApp';
 type Route = { page: string; id?: string };
@@ -101,7 +110,11 @@ export default function App() {
       userId={user?.id ?? 'local'}
       canManageSessionSongs={localMode || user?.app_metadata?.role === 'admin'}
     >
-      <Workspace email={user?.email ?? 'Local workspace'} installation={installation} />
+      <Workspace
+        email={user?.email ?? 'Local workspace'}
+        installation={installation}
+        isAdmin={user?.app_metadata?.role === 'admin'}
+      />
     </WorkspaceProvider>
   );
 }
@@ -211,12 +224,35 @@ function Auth({ initialError }: { initialError: string }) {
     </div>
   );
 }
+function ProfileAvatar({
+  initial,
+  isAdmin,
+  small = false,
+}: {
+  initial: string;
+  isAdmin: boolean;
+  small?: boolean;
+}) {
+  return (
+    <span
+      className={`avatar profile-avatar ${small ? 'small' : ''}`}
+      role="img"
+      aria-label={isAdmin ? 'Admin profile' : 'User profile'}
+      title={isAdmin ? 'Admin' : undefined}
+    >
+      {isAdmin && <Crown className="admin-crown" size={18} aria-hidden="true" />}
+      {initial}
+    </span>
+  );
+}
 function Workspace({
   email,
   installation,
+  isAdmin,
 }: {
   email: string;
   installation: ReturnType<typeof useAppInstallation>;
+  isAdmin: boolean;
 }) {
   const ws = useWorkspace(),
     [route, setRoute] = useState(readRoute),
@@ -226,6 +262,8 @@ function Workspace({
     [docQuery, setDocQuery] = useState('');
   const [modal, setModal] = useState<'document' | 'template' | null>(null),
     [name, setName] = useState(''),
+    [songType, setSongType] = useState<SongType>('song'),
+    [artistName, setArtistName] = useState(''),
     [sessionForm, setSessionForm] = useState<Session | 'new' | null>(null),
     [deleteSession, setDeleteSession] = useState<Session | null>(null),
     [editTemplate, setEditTemplate] = useState<string | null>(null),
@@ -286,6 +324,8 @@ function Workspace({
   ];
   function openCreate(type: 'document' | 'template') {
     setName('');
+    setSongType('song');
+    setArtistName('');
     setModal(type);
   }
   function openTemplate(id: string) {
@@ -304,12 +344,12 @@ function Workspace({
   const documentRows = (items: typeof recent) =>
     items.map((d) => (
       <button className="document-row" key={d.id} onClick={() => navigate('documents', d.id)}>
-        <span className="document-icon">
-          <Music2 size={20} />
+        <span className={`document-icon ${songTypeMeta(d.song_type).color}`}>
+          <TypeIcon type={d.song_type} size={20} />
         </span>
         <span className="row-copy">
           <strong>{d.title || 'Untitled'}</strong>
-          <small>Updated {dateLabel(d.updated_at)}</small>
+          <small>{d.artist || `Updated ${dateLabel(d.updated_at)}`}</small>
         </span>
         <ChevronRight size={17} />
       </button>
@@ -358,7 +398,7 @@ function Workspace({
               </button>
             </div>
             <div className="workspace-label">
-              <span className="avatar">{supabase ? email[0].toUpperCase() : 'J'}</span>
+              <ProfileAvatar initial={supabase ? email[0].toUpperCase() : 'J'} isAdmin={isAdmin} />
               <span>
                 <strong>My Workspace</strong>
                 <small>{email}</small>
@@ -422,7 +462,11 @@ function Workspace({
                   <Search size={20} />
                 </button>
                 <span className="topbar-divider" />
-                <span className="avatar small">{supabase ? email[0].toUpperCase() : 'J'}</span>
+                <ProfileAvatar
+                  initial={supabase ? email[0].toUpperCase() : 'J'}
+                  isAdmin={isAdmin}
+                  small
+                />
               </div>
             </header>
             <SaveError />
@@ -434,29 +478,16 @@ function Workspace({
             )}
             {route.page === 'home' && (
               <main className="page home-page">
-                <div className="page-heading">
-                  <div>
-                    <span className="eyebrow">A LITTLE SPACE FOR YOUR NEXT BIG IDEA</span>
-                    <h1>
-                      Good{' '}
-                      {now.getHours() < 12
-                        ? 'morning'
-                        : now.getHours() < 17
-                          ? 'afternoon'
-                          : 'evening'}
-                      {supabase ? `, ${email.split('@')[0]}` : ''}
-                      <span className="greeting-dot">.</span>
-                    </h1>
-                    <p>Pick up where you left off. Make something worth playing.</p>
-                  </div>
+                <div className="page-heading home-actions">
                   <button className="button" onClick={() => openCreate('document')}>
-                    <Plus size={18} /> New document
+                    <Plus size={18} /> New song
                   </button>
                 </div>
                 <div className="stats">
                   {[
                     {
-                      title: 'Documents',
+                      title: 'Songs',
+                      page: 'documents',
                       count: ws.data.documents.length,
                       icon: Music2,
                       color: 'indigo',
@@ -464,6 +495,7 @@ function Workspace({
                     },
                     {
                       title: 'Sessions',
+                      page: 'sessions',
                       count: ws.data.sessions.length,
                       icon: CalendarDays,
                       color: 'violet',
@@ -471,17 +503,14 @@ function Workspace({
                     },
                     {
                       title: 'Templates',
+                      page: 'templates',
                       count: ws.data.templates.length,
                       icon: Layers,
                       color: 'teal',
                       detail: 'Your favorite views',
                     },
-                  ].map(({ title, count, icon: Icon, color, detail }) => (
-                    <button
-                      className="stat"
-                      key={title}
-                      onClick={() => navigate(title.toLowerCase())}
-                    >
+                  ].map(({ title, page, count, icon: Icon, color, detail }) => (
+                    <button className="stat" key={title} onClick={() => navigate(page)}>
                       <span className={`stat-icon ${color}`}>
                         <Icon size={23} />
                       </span>
@@ -503,34 +532,38 @@ function Workspace({
                     <div className="feature-grid">
                       {[
                         {
-                          title: 'Documents',
+                          title: 'Songs',
+                          page: 'documents',
                           text: 'Bring your lyrics and chords together.',
                           icon: Music2,
                           color: 'indigo',
                         },
                         {
                           title: 'Sessions',
+                          page: 'sessions',
                           text: 'A setlist for every time you play.',
                           icon: CalendarDays,
                           color: 'violet',
                         },
                         {
                           title: 'Templates',
+                          page: 'templates',
                           text: 'The right order for every occasion.',
                           icon: Layers,
                           color: 'teal',
                         },
                         {
                           title: 'Search',
+                          page: 'search',
                           text: 'Find that song you had in mind.',
                           icon: Search,
                           color: 'amber',
                         },
-                      ].map(({ title, text, icon: Icon, color }) => (
+                      ].map(({ title, page, text, icon: Icon, color }) => (
                         <button
                           className={`feature ${color}`}
                           key={title}
-                          onClick={() => navigate(title.toLowerCase())}
+                          onClick={() => navigate(page)}
                         >
                           <div>
                             <span className="feature-icon">
@@ -544,7 +577,7 @@ function Workspace({
                       ))}
                     </div>
                     <div className="section-heading spaced">
-                      <h2>Recent documents</h2>
+                      <h2>Recent songs</h2>
                       <button className="text-button" onClick={() => navigate('documents')}>
                         View all <ArrowUpRight size={15} />
                       </button>
@@ -561,7 +594,7 @@ function Workspace({
                             className="button secondary"
                             onClick={() => openCreate('document')}
                           >
-                            <Plus size={17} /> Create a document
+                            <Plus size={17} /> Create a song
                           </button>
                         </Empty>
                       )}
@@ -693,7 +726,7 @@ function Workspace({
                               className={`doc-nav ${route.id === id ? 'selected' : ''}`}
                               onClick={() => navigate('documents', id)}
                             >
-                              <Music2 size={17} />
+                              <TypeIcon type={d.song_type} />
                               <span>{d.title || 'Untitled'}</span>
                             </button>
                           );
@@ -706,7 +739,7 @@ function Workspace({
                           className={`doc-nav ${route.id === d.id ? 'selected' : ''}`}
                           onClick={() => navigate('documents', d.id)}
                         >
-                          <Music2 size={17} />
+                          <TypeIcon type={d.song_type} />
                           <span>{d.title || 'Untitled'}</span>
                         </button>
                       ))
@@ -998,11 +1031,7 @@ function Workspace({
       {(modal || editTemplate) && (
         <Modal
           title={
-            editTemplate
-              ? 'Rename template'
-              : modal === 'document'
-                ? 'New document'
-                : 'New template'
+            editTemplate ? 'Rename template' : modal === 'document' ? 'New song' : 'New template'
           }
           onClose={() => {
             setModal(null);
@@ -1017,7 +1046,8 @@ function Workspace({
                 ws.saveTemplate(editTemplate, name);
                 setEditTemplate(null);
               } else if (modal === 'document') {
-                const doc = ws.createDocument(name);
+                if (songType === 'artist' && !artistName.trim()) return;
+                const doc = ws.createDocument(name, songType, artistName);
                 navigate('documents', doc.id);
               } else {
                 const t = ws.createTemplate(name);
@@ -1026,8 +1056,28 @@ function Workspace({
               setModal(null);
             }}
           >
+            {modal === 'document' && !editTemplate && (
+              <div className="type-picker" role="radiogroup" aria-label="Song type">
+                {SONG_TYPES.map(({ value, label, icon: Icon, color }) => (
+                  <label
+                    key={value}
+                    className={`type-option ${color} ${songType === value ? 'selected' : ''}`}
+                  >
+                    <input
+                      type="radio"
+                      name="song-type"
+                      value={value}
+                      checked={songType === value}
+                      onChange={() => setSongType(value)}
+                    />
+                    <Icon size={19} />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
             <label>
-              {modal === 'document' ? 'Document title' : 'Template name'}
+              {modal === 'document' ? 'Name' : 'Template name'}
               <input
                 autoFocus
                 required
@@ -1037,6 +1087,18 @@ function Workspace({
                 placeholder={modal === 'document' ? 'Give your song a name' : 'Acoustic favorites'}
               />
             </label>
+            {modal === 'document' && !editTemplate && songType === 'artist' && (
+              <label>
+                Artist name
+                <input
+                  required
+                  maxLength={200}
+                  value={artistName}
+                  onChange={(e) => setArtistName(e.target.value)}
+                  placeholder="Who plays it?"
+                />
+              </label>
+            )}
             {modal === 'template' && (
               <p className="muted">
                 Templates include all your documents. Drag songs into your preferred order in the
@@ -1054,7 +1116,16 @@ function Workspace({
               >
                 Cancel
               </button>
-              <button className="button" disabled={!name.trim()}>
+              <button
+                className="button"
+                disabled={
+                  !name.trim() ||
+                  (modal === 'document' &&
+                    !editTemplate &&
+                    songType === 'artist' &&
+                    !artistName.trim())
+                }
+              >
                 {editTemplate ? 'Save name' : 'Create'}
               </button>
             </div>
@@ -1144,6 +1215,7 @@ function SearchResults({
         id: d.id,
         title: d.title,
         type: 'Document',
+        song_type: d.song_type,
         open: () => navigate('documents', d.id),
       })),
     ...data.sessions
@@ -1152,11 +1224,18 @@ function SearchResults({
         id: s.id,
         title: s.name,
         type: 'Session',
+        song_type: null,
         open: () => navigate('session', s.id),
       })),
     ...data.templates
       .filter((t) => t.name.toLowerCase().includes(q))
-      .map((t) => ({ id: t.id, title: t.name, type: 'Template', open: () => openTemplate(t.id) })),
+      .map((t) => ({
+        id: t.id,
+        title: t.name,
+        type: 'Template',
+        song_type: null,
+        open: () => openTemplate(t.id),
+      })),
   ];
   return results.length ? (
     <>
@@ -1166,9 +1245,11 @@ function SearchResults({
       <div className="list-card">
         {results.map((r) => (
           <button className="document-row" key={`${r.type}-${r.id}`} onClick={r.open}>
-            <span className="document-icon">
+            <span
+              className={`document-icon ${r.type === 'Document' ? songTypeMeta(r.song_type).color : ''}`}
+            >
               {r.type === 'Document' ? (
-                <Music2 size={20} />
+                <TypeIcon type={r.song_type} size={20} />
               ) : r.type === 'Session' ? (
                 <CalendarDays size={20} />
               ) : (

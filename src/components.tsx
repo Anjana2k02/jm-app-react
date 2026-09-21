@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { X, GripVertical, Music2 } from 'lucide-react';
+import { X, GripVertical, Music2, ListMusic, MicVocal } from 'lucide-react';
+import type { SongType } from './model';
 import {
   DndContext,
   KeyboardSensor,
@@ -161,6 +162,22 @@ function SortableRow({
       {children}
     </div>
   );
+}
+export const SONG_TYPES: {
+  value: SongType;
+  label: string;
+  icon: typeof Music2;
+  color: string;
+}[] = [
+  { value: 'song', label: 'Song', icon: Music2, color: 'indigo' },
+  { value: 'medley', label: 'Medley', icon: ListMusic, color: 'violet' },
+  { value: 'artist', label: 'Artist', icon: MicVocal, color: 'teal' },
+];
+export const songTypeMeta = (type?: string | null) =>
+  SONG_TYPES.find((t) => t.value === type) ?? SONG_TYPES[0];
+export function TypeIcon({ type, size = 17 }: { type?: string | null; size?: number }) {
+  const { icon: Icon, color } = songTypeMeta(type);
+  return <Icon size={size} className={`type-icon ${color}`} />;
 }
 export function dateLabel(date?: string | null) {
   return date

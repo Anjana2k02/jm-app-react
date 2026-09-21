@@ -2,11 +2,14 @@ export type Op = {
   insert?: string | Record<string, unknown>;
   attributes?: Record<string, unknown>;
 };
+export type SongType = 'song' | 'medley' | 'artist';
 export type Doc = {
   id: string;
   user_id: string;
   title: string;
   content: Op[];
+  song_type?: SongType | null;
+  artist?: string | null;
   created_at: string;
   updated_at: string;
 };
