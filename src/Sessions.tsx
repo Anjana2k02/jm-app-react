@@ -7,11 +7,13 @@ import {
   Plus,
   Search,
   X,
+  Maximize,
 } from 'lucide-react';
 import { useWorkspace } from './workspace';
 import { Empty, Modal, SortableList, dateLabel } from './components';
 import { RichViewer } from './Editor';
 import type { Session } from './model';
+import { useLiveMode } from './useLiveMode';
 export function SessionForm({
   session,
   onClose,
@@ -87,17 +89,28 @@ export function SessionDetail({ session, onBack }: { session: Session; onBack: (
   const selectedId = selected && ids.includes(selected) ? selected : ids[0],
     index = ids.indexOf(selectedId),
     doc = ws.data.documents.find((d) => d.id === selectedId);
+  const nextSong = ws.data.documents.find((d) => d.id === ids[index + 1]);
+  const { root, live, toggle, gestures } = useLiveMode(Boolean(doc));
   function select(id: string) {
     setSelected(id);
     if (window.innerWidth < 760) setCollapsed(true);
   }
   return (
-    <div className="session-detail">
+    <div ref={root} className={`session-detail ${live ? 'live-mode' : ''}`}>
       <header className="session-header">
         <button className="button ghost" onClick={onBack}>
           <ArrowLeft size={19} /> Back
         </button>
         <h1>{session.name}</h1>
+        <button
+          className="button secondary live-mode-button"
+          onClick={toggle}
+          disabled={!doc}
+          aria-pressed={live}
+          title="Show only the song. Double-tap the song area to toggle Live Mode; press Escape to exit."
+        >
+          <Maximize size={16} /> Live Mode
+        </button>
       </header>
       <div className={`session-layout ${collapsed ? 'collapsed' : ''}`}>
         {!collapsed && (
@@ -191,8 +204,14 @@ export function SessionDetail({ session, onBack }: { session: Session; onBack: (
             </>
           )}
         </aside>
-        <main className="song-viewer">
+        <main className="song-viewer" tabIndex={-1} aria-label="Session song viewer" {...gestures}>
           <div className="song-navigation">
+            {live && (
+              <div className="live-next-song" aria-live="polite">
+                <span>{nextSong ? 'UP NEXT' : 'SETLIST'}</span>
+                <strong>{nextSong ? nextSong.title || 'Untitled' : 'Last song'}</strong>
+              </div>
+            )}
             <button
               className="button secondary"
               disabled={index <= 0}

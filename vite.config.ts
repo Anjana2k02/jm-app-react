@@ -25,6 +25,17 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_SUPABASE_CONFIG_ERROR': JSON.stringify(error),
       'import.meta.env.WORKSPACE_MODE': JSON.stringify(workspaceMode),
     },
-    build: { rollupOptions: { output: { manualChunks: { editor: ['quill'] } } } },
+    build: {
+      rollupOptions: {
+        output: {
+          // Keep the large, shared libraries independently cacheable from app code.
+          manualChunks: {
+            react: ['react', 'react-dom', 'react-dom/client'],
+            ...(workspaceMode !== 'local' && !error ? { supabase: ['@supabase/supabase-js'] } : {}),
+            editor: ['quill'],
+          },
+        },
+      },
+    },
   };
 });

@@ -1230,6 +1230,60 @@ input[type='checkbox'] {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.session-header > .button {
+  flex-shrink: 0;
+}
+.live-mode-button {
+  white-space: nowrap;
+  font-size: 12px;
+  gap: 7px;
+}
+.session-detail.live-mode {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: 100%;
+  height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+.live-mode .session-header,
+.live-mode .song-panel,
+.live-mode .drawer-scrim {
+  display: none;
+}
+.live-mode .song-navigation {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  flex-shrink: 0;
+  row-gap: 12px;
+}
+.live-mode .song-navigation > span {
+  text-align: center;
+}
+.live-next-song {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  text-align: right;
+}
+.live-next-song span {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--muted);
+}
+.live-next-song strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.song-viewer {
+  touch-action: manipulation;
+}
 .session-layout {
   display: flex;
   min-height: 0;
