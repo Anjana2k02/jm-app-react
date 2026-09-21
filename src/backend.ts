@@ -4,7 +4,7 @@ import { emptyData } from './model';
 import { validateSupabaseConfig } from './config';
 const url = import.meta.env.VITE_SUPABASE_URL,
   key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-export const localMode = import.meta.env.VITE_WORKSPACE_MODE === 'local';
+export const localMode = import.meta.env.WORKSPACE_MODE === 'local';
 export const projectUrl = url || '';
 export function errorMessage(error: unknown) {
   return error && typeof error === 'object' && 'message' in error
@@ -13,7 +13,7 @@ export function errorMessage(error: unknown) {
 }
 export const configError =
   import.meta.env.VITE_SUPABASE_CONFIG_ERROR ||
-  validateSupabaseConfig(url, key, import.meta.env.VITE_WORKSPACE_MODE || 'cloud');
+  validateSupabaseConfig(url, key, import.meta.env.WORKSPACE_MODE || 'cloud');
 export const supabase = !localMode && url && key && !configError ? createClient(url, key) : null;
 function requireBackend() {
   if (!supabase && !localMode) throw new Error(configError || 'Supabase is not connected.');

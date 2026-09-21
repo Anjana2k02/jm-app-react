@@ -11,13 +11,13 @@ export default defineConfig({
     {
       command: 'npm run dev -- --port 5183 --strictPort',
       url: 'http://127.0.0.1:5183',
-      env: { VITE_WORKSPACE_MODE: 'local', VITE_SUPABASE_URL: '', VITE_SUPABASE_ANON_KEY: '' },
+      env: { WORKSPACE_MODE: 'local', VITE_SUPABASE_URL: '', VITE_SUPABASE_ANON_KEY: '' },
     },
     {
       command: 'npm run dev -- --port 5184 --strictPort',
       url: 'http://127.0.0.1:5184',
       env: {
-        VITE_WORKSPACE_MODE: 'cloud',
+        WORKSPACE_MODE: 'cloud',
         SUPABASE_URL: 'http://127.0.0.1:54321',
         SUPABASE_ANON_KEY: 'test-public-key',
         VITE_SUPABASE_URL: '',

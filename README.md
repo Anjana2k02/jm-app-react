@@ -12,7 +12,7 @@ npm install
 npm run dev
 ```
 
-Open the localhost URL printed by Vite. The default is a Supabase workspace. Missing or invalid configuration displays a setup screen; the app does not silently save to local storage. To deliberately use the local-only workspace, set `VITE_WORKSPACE_MODE=local` in `react-app/.env`. Existing local data is preserved and remains separate from cloud accounts.
+Open the localhost URL printed by Vite. The default is a Supabase workspace. Missing or invalid configuration displays a setup screen; the app does not silently save to local storage. To deliberately use the local-only workspace, set `WORKSPACE_MODE=local` in `react-app/.env`. Existing local data is preserved and remains separate from cloud accounts.
 
 ## Connect the existing Supabase backend
 
@@ -28,7 +28,7 @@ Alternatively, copy `react-app/.env.example` to `react-app/.env` and set:
 ```dotenv
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-public-anon-or-publishable-key
-VITE_WORKSPACE_MODE=cloud
+WORKSPACE_MODE=cloud
 ```
 
 `SUPABASE_PUBLISHABLE_KEY` / `VITE_SUPABASE_PUBLISHABLE_KEY` are supported as alternatives to the anon key. Process environment takes precedence, then `react-app/.env` (including mode-specific files), then the Flutter root `.env`. URL/key pairs are kept together: an incomplete higher-priority configuration produces an error rather than borrowing a key from another project. Vite passes only the validated public pair into the browser. Server secret/service-role keys are rejected.
@@ -52,7 +52,7 @@ The repository's `vercel.json` selects the Vite framework, installs the locked d
    ```dotenv
    SUPABASE_URL=https://your-project.supabase.co
    SUPABASE_PUBLISHABLE_KEY=your-public-publishable-key
-   VITE_WORKSPACE_MODE=cloud
+   WORKSPACE_MODE=cloud
    ```
 
    `SUPABASE_ANON_KEY` can replace `SUPABASE_PUBLISHABLE_KEY` for projects using an anon key. This app's Vite configuration explicitly reads these `SUPABASE_*` variables; they do not need a `VITE_` prefix. These are public browser credentials included in the build. Never use a server secret or service-role key.

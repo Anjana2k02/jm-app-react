@@ -18,7 +18,7 @@ export function resolveSupabaseConfig(...sources: Environment[]) {
 
 export function validateSupabaseConfig(url: string, key: string, mode = 'cloud') {
   if (mode === 'local') return '';
-  if (mode !== 'cloud') return 'VITE_WORKSPACE_MODE must be cloud or local.';
+  if (mode !== 'cloud') return 'WORKSPACE_MODE must be cloud or local.';
   if (!url || !key)
     return 'Supabase is not configured. Add your project URL and public API key to the root .env or react-app/.env, then restart the development server.';
   try {

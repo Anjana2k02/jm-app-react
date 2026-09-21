@@ -6,9 +6,9 @@ import { resolveSupabaseConfig, validateSupabaseConfig } from './src/config';
 export default defineConfig(({ mode }) => {
   const appDir = fileURLToPath(new URL('.', import.meta.url));
   const rootDir = fileURLToPath(new URL('..', import.meta.url));
-  const appEnv = loadEnv(mode, appDir, ['VITE_', 'SUPABASE_']);
+  const appEnv = loadEnv(mode, appDir, ['VITE_', 'SUPABASE_', 'WORKSPACE_MODE']);
   const rootEnv = loadEnv(mode, rootDir, ['SUPABASE_']);
-  const workspaceMode = appEnv.VITE_WORKSPACE_MODE || 'cloud';
+  const workspaceMode = appEnv.WORKSPACE_MODE || 'cloud';
   const config = resolveSupabaseConfig(process.env, appEnv, rootEnv);
   const error = validateSupabaseConfig(config.url, config.key, workspaceMode);
   return {
@@ -23,7 +23,7 @@ export default defineConfig(({ mode }) => {
       ),
       'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY': JSON.stringify(''),
       'import.meta.env.VITE_SUPABASE_CONFIG_ERROR': JSON.stringify(error),
-      'import.meta.env.VITE_WORKSPACE_MODE': JSON.stringify(workspaceMode),
+      'import.meta.env.WORKSPACE_MODE': JSON.stringify(workspaceMode),
     },
     build: { rollupOptions: { output: { manualChunks: { editor: ['quill'] } } } },
   };
