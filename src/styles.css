@@ -416,6 +416,19 @@ input[type='checkbox'] {
   height: 15px;
   top: -11px;
 }
+.admin-tag {
+  margin-left: 6px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: #a65f00;
+  background: #f6c4532e;
+  border: 1px solid #f6c45360;
+  padding: 1px 5px;
+  border-radius: 999px;
+  vertical-align: 1px;
+}
 .nav-label {
   font-size: 8px;
   letter-spacing: 1.5px;
@@ -1728,6 +1741,9 @@ dialog textarea {
 :root[data-theme='dark'] .document-icon.teal {
   background: #2a2638;
 }
+:root[data-theme='dark'] .admin-tag {
+  color: #f0c05a;
+}
 :root[data-theme='dark'] .type-icon.indigo,
 :root[data-theme='dark'] .type-option.indigo svg,
 :root[data-theme='dark'] .type-option.indigo.selected,
@@ -1781,6 +1797,9 @@ dialog textarea {
   :root[data-theme='system'] .document-icon.violet,
   :root[data-theme='system'] .document-icon.teal {
     background: #2a2638;
+  }
+  :root[data-theme='system'] .admin-tag {
+    color: #f0c05a;
   }
   :root[data-theme='system'] .type-icon.indigo,
   :root[data-theme='system'] .type-option.indigo svg,

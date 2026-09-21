@@ -400,7 +400,10 @@ function Workspace({
             <div className="workspace-label">
               <ProfileAvatar initial={supabase ? email[0].toUpperCase() : 'J'} isAdmin={isAdmin} />
               <span>
-                <strong>My Workspace</strong>
+                <strong>
+                  My Workspace
+                  {isAdmin && <span className="admin-tag">Admin</span>}
+                </strong>
                 <small>{email}</small>
               </span>
             </div>
