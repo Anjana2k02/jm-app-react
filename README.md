@@ -4,7 +4,7 @@ React + TypeScript port of the Flutter app in the parent directory. Uses Vite, Q
 
 ## Run
 
-Requires Node.js 22.12+ (or a compatible newer LTS) and npm.
+Requires Node.js 22.12+ within the 22.x release line and npm, matching the Vercel build configuration.
 
 ```sh
 cd react-app
@@ -41,19 +41,29 @@ Sign-up uses the project's email-confirmation policy. Where confirmation is enab
 
 The [storage setup script](supabase/storage.sql) creates a missing `doc-images` bucket and owner-scoped insert/select policies. Run it in your project's SQL editor if uploads fail because the bucket or policies are missing. It does not change an existing bucket's settings. A public bucket is required for the image URLs used by both clients.
 
-## Deploy to Netlify
+## Deploy to Vercel
 
-The repository's `.nvmrc` and `netlify.toml` select Node.js 22, run `npm run build`, and publish `dist`. Keep the base directory at the repository root. Node.js 18 is not supported by the installed Vite and Supabase dependencies.
+The repository's `vercel.json` selects the Vite framework, installs the locked dependencies with `npm ci`, runs `npm run build`, and publishes `dist`. `package.json` selects Node.js 22.x for Vercel, matching the local `.nvmrc`. See [Vercel's Vite guide](https://vercel.com/docs/frameworks/frontend/vite) and [Node.js version configuration](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions).
 
-In Netlify's environment variables, set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` (or `SUPABASE_ANON_KEY`) to the project's public browser configuration. Set `VITE_WORKSPACE_MODE=cloud`. These values are intentionally included in the browser bundle; leave **Contains secret values** unchecked when creating them. Never use a server secret or service-role key.
+1. In Vercel, create a new project and import this Git repository.
+2. Keep **Root Directory** at the repository root (the directory containing `package.json` and `vercel.json`). The framework is **Vite**, the build command is **npm run build**, and the output directory is **dist**.
+3. Add the following environment variables for **Production** and, if needed, **Preview**:
 
-If these public settings were already marked as secrets, recreate them without the secret flag, or set `SECRETS_SCAN_OMIT_KEYS` to only the public variable names reported by the scan. Keep secret scanning enabled for other values. Environment changes require a new deployment.
+   ```dotenv
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_PUBLISHABLE_KEY=your-public-publishable-key
+   VITE_WORKSPACE_MODE=cloud
+   ```
 
-After pushing configuration changes, trigger a new production deployment. If it fails, inspect the complete deploy log: a secret-scanning failure is separate from a dependency installation or compilation error.
+   `SUPABASE_ANON_KEY` can replace `SUPABASE_PUBLISHABLE_KEY` for projects using an anon key. This app's Vite configuration explicitly reads these `SUPABASE_*` variables; they do not need a `VITE_` prefix. These are public browser credentials included in the build. Never use a server secret or service-role key.
+
+4. Deploy and open the production HTTPS address. Environment-variable changes require a new deployment.
+
+The app uses hash routes such as `/#settings`, so no catch-all rewrite is needed. Vercel serves the manifest and app icons directly from the build output. After changing hosting domains, update the Supabase Auth Site URL to the new production address so confirmation emails return to this app. Re-add the home-screen app from the new address; a shortcut installed from the previous domain keeps opening that domain. Local-only data stays with its original browser origin; export a backup before moving if needed. Cloud users can sign in with the same account.
 
 ## Add to your phone's home screen
 
-Deploy the latest build to your HTTPS Netlify address, then open that address on your phone. The app includes a web app manifest, a purple music-note logo, Android icons (including a maskable icon), and an Apple touch icon. Home-screen launches open in a standalone app window.
+Deploy the latest build to your HTTPS Vercel address, then open that address on your phone. The app includes a web app manifest, a purple music-note logo, Android icons (including a maskable icon), and an Apple touch icon. Home-screen launches open in a standalone app window.
 
 - **Android / Chrome:** open **Settings** in Jammer Docs and tap **Install Jammer Docs** when offered. Alternatively, use Chrome's menu → **Add to Home screen** / **Install app**.
 - **iPhone / iPad:** open the site in Safari, tap **Share** → **Add to Home Screen**, leave **Open as Web App** enabled if shown, then tap **Add**.
