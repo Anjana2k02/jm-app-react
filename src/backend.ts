@@ -58,11 +58,26 @@ export async function remove(table: keyof Data, column: string, id: string, docu
   const { error } = await query;
   if (error) throw new Error(`Could not delete from ${table}: ${errorMessage(error)}`);
 }
+// Roles live in the user_profiles table (user_id, role); app_metadata.role also counts.
+export async function fetchUserRole(userId: string): Promise<string | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('role')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) {
+    console.warn('[auth] could not read user_profiles role:', error.message);
+    return null;
+  }
+  return (data as { role?: string } | null)?.role ?? null;
+}
 async function requireSessionAdmin() {
   const { data, error } = await supabase!.auth.getUser();
   if (error) throw error;
-  if (data.user?.app_metadata?.role !== 'admin')
-    throw new Error('Only admins can change the songs in a session.');
+  if (data.user?.app_metadata?.role === 'admin') return;
+  const role = data.user ? await fetchUserRole(data.user.id) : null;
+  if (role !== 'admin') throw new Error('Only admins can change the songs in a session.');
 }
 export async function uploadImage(file: File, userId: string) {
   requireBackend();

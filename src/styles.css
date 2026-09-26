@@ -1132,6 +1132,38 @@ input[type='checkbox'] {
   top: 20px;
   display: flex;
 }
+.option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+.option-list button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border);
+  background: transparent;
+  padding: 14px 15px;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ink);
+  text-align: left;
+}
+.option-list button:hover:not(:disabled) {
+  background: var(--soft);
+  border-color: var(--primary);
+}
+.option-list button svg {
+  color: var(--muted);
+}
+.option-list button.danger {
+  color: #bc354b;
+}
+.option-list button.danger svg {
+  color: #bc354b;
+}
 .card-title {
   display: flex;
   justify-content: space-between;

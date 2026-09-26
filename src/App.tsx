@@ -22,9 +22,12 @@ import {
   Eye,
   EyeOff,
   Crown,
+  MoreVertical,
+  FileDown,
 } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
-import { supabase, configError, localMode } from './backend';
+import { supabase, configError, localMode, errorMessage, fetchUserRole } from './backend';
+import { exportSessionPdf } from './pdf';
 import { WorkspaceProvider, useWorkspace } from './workspace';
 import {
   Empty,
@@ -37,7 +40,7 @@ import {
 } from './components';
 import { Editor } from './Editor';
 import { SessionDetail, SessionForm } from './Sessions';
-import { plainText, type Session, type SongType } from './model';
+import { plainText, type Doc, type Session, type SongType } from './model';
 import { ConnectionStatus } from './ConnectionStatus';
 import { InstallApp, useAppInstallation } from './InstallApp';
 type Route = { page: string; id?: string };
@@ -51,6 +54,7 @@ function navigate(page: string, id?: string) {
 export default function App() {
   const installation = useAppInstallation();
   const [user, setUser] = useState<User | null>(null),
+    [role, setRole] = useState<string | null>(null),
     [loading, setLoading] = useState(Boolean(supabase)),
     [authError, setAuthError] = useState('');
   useEffect(() => {
@@ -80,6 +84,31 @@ export default function App() {
       data.subscription.unsubscribe();
     };
   }, []);
+  useEffect(() => {
+    if (!user) {
+      setRole(null);
+      return;
+    }
+    let active = true;
+    void fetchUserRole(user.id).then((r) => {
+      if (active) setRole(r);
+    });
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
+  useEffect(() => {
+    if (user)
+      console.log(
+        '[auth] signed in:',
+        user.email,
+        '| user_profiles role:',
+        role ?? '(none)',
+        '| app_metadata role:',
+        user.app_metadata?.role ?? '(none)',
+      );
+  }, [user, role]);
+  const isAdmin = role === 'admin' || user?.app_metadata?.role === 'admin';
   if (configError)
     return (
       <div className="auth-page">
@@ -108,12 +137,12 @@ export default function App() {
     <WorkspaceProvider
       key={user?.id ?? 'local'}
       userId={user?.id ?? 'local'}
-      canManageSessionSongs={localMode || user?.app_metadata?.role === 'admin'}
+      canManageSessionSongs={localMode || isAdmin}
     >
       <Workspace
         email={user?.email ?? 'Local workspace'}
         installation={installation}
-        isAdmin={user?.app_metadata?.role === 'admin'}
+        isAdmin={isAdmin}
       />
     </WorkspaceProvider>
   );
@@ -264,6 +293,8 @@ function Workspace({
     [name, setName] = useState(''),
     [songType, setSongType] = useState<SongType>('song'),
     [artistName, setArtistName] = useState(''),
+    [menuFor, setMenuFor] = useState<Session | null>(null),
+    [exporting, setExporting] = useState<string | null>(null),
     [sessionForm, setSessionForm] = useState<Session | 'new' | null>(null),
     [deleteSession, setDeleteSession] = useState<Session | null>(null),
     [editTemplate, setEditTemplate] = useState<string | null>(null),
@@ -292,6 +323,22 @@ function Workspace({
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
   }, []);
+  async function exportPdf(s: Session) {
+    setExporting(s.id);
+    try {
+      const songs = ws.data.session_songs
+        .filter((i) => i.session_id === s.id)
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((i) => ws.data.documents.find((d) => d.id === i.document_id))
+        .filter((d): d is Doc => Boolean(d));
+      await exportSessionPdf(s, songs);
+      setMenuFor(null);
+    } catch (e) {
+      setNotice(`PDF export failed: ${errorMessage(e)}`);
+    } finally {
+      setExporting(null);
+    }
+  }
   const docs = ws
       .templateDocuments(templateId)
       .filter((d) => d.title.toLowerCase().includes(docQuery.toLowerCase())),
@@ -805,17 +852,11 @@ function Workspace({
                         <div className="card-tools">
                           <button
                             className="icon-button"
-                            aria-label={`Edit ${s.name}`}
-                            onClick={() => setSessionForm(s)}
+                            aria-label={`Options for ${s.name}`}
+                            aria-haspopup="dialog"
+                            onClick={() => setMenuFor(s)}
                           >
-                            <Pencil size={17} />
-                          </button>
-                          <button
-                            className="icon-button"
-                            aria-label={`Delete ${s.name}`}
-                            onClick={() => setDeleteSession(s)}
-                          >
-                            <Trash2 size={17} />
+                            <MoreVertical size={17} />
                           </button>
                         </div>
                         <button className="card-title" onClick={() => navigate('session', s.id)}>
@@ -1135,6 +1176,34 @@ function Workspace({
           </form>
         </Modal>
       )}
+      {menuFor && (
+        <Modal title={menuFor.name} onClose={() => setMenuFor(null)}>
+          <div className="option-list">
+            <button disabled={Boolean(exporting)} onClick={() => void exportPdf(menuFor)}>
+              <FileDown size={18} /> {exporting ? 'Exporting…' : 'Export'}
+            </button>
+            <button
+              onClick={() => {
+                const s = menuFor;
+                setMenuFor(null);
+                setSessionForm(s);
+              }}
+            >
+              <Pencil size={18} /> Edit
+            </button>
+            <button
+              className="danger"
+              onClick={() => {
+                const s = menuFor;
+                setMenuFor(null);
+                setDeleteSession(s);
+              }}
+            >
+              <Trash2 size={18} /> Delete
+            </button>
+          </div>
+        </Modal>
+      )}
       {sessionForm && (
         <SessionForm
           session={sessionForm === 'new' ? undefined : sessionForm}
@@ -1147,15 +1216,19 @@ function Workspace({
       )}
       {(deleteSession || deleteTemplate) && (
         <Modal
-          title={`Delete ${deleteSession ? 'session' : 'template'}?`}
+          title={deleteSession ? `Delete "${deleteSession.name}"?` : 'Delete template?'}
           onClose={() => {
             setDeleteSession(null);
             setDeleteTemplate(null);
           }}
         >
           <p>
-            This removes the {deleteSession ? 'session and its setlist' : 'template order'}. Your
-            documents stay in your library.
+            Are you sure you want to delete this {deleteSession ? 'session' : 'template'}? This
+            cannot be undone.{' '}
+            {deleteSession
+              ? 'The session and its setlist are removed'
+              : 'The template order is removed'}
+            , but your songs stay in your library.
           </p>
           <div className="modal-actions">
             <button
@@ -1179,7 +1252,7 @@ function Workspace({
                 setDeleteTemplate(null);
               }}
             >
-              Delete
+              Yes, delete
             </button>
           </div>
         </Modal>
