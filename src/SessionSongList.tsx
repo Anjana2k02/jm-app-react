@@ -10,7 +10,6 @@ import {
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { moveItem, type Doc } from './model';
-import { dateLabel } from './components';
 
 export function SessionSongList({
   songs,
@@ -192,7 +191,6 @@ function SessionSong({
           <span className="song-number">{String(index + 1).padStart(2, '0')}</span>
           <span>
             <strong>{song.title || 'Untitled'}</strong>
-            <small>Updated {dateLabel(song.updated_at)}</small>
           </span>
         </button>
       </div>

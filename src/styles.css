@@ -1132,6 +1132,44 @@ input[type='checkbox'] {
   top: 20px;
   display: flex;
 }
+.dup-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dup-hint {
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.dup-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  background: transparent;
+  padding: 8px 9px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: var(--ink);
+  text-align: left;
+  min-width: 0;
+}
+.dup-row:hover {
+  background: var(--soft);
+}
+.dup-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dup-row small {
+  color: var(--muted);
+  flex-shrink: 0;
+}
 .option-list {
   display: flex;
   flex-direction: column;
@@ -1422,6 +1460,9 @@ input[type='checkbox'] {
   flex: 1;
   overflow-wrap: anywhere;
 }
+.session-song-list {
+  gap: 7px;
+}
 .session-song-row {
   position: relative;
   border-radius: 10px;
@@ -1438,7 +1479,7 @@ input[type='checkbox'] {
   padding-right: 0;
 }
 .session-song-row .song-select {
-  min-height: 88px;
+  min-height: 50px;
   touch-action: pan-y;
 }
 .session-song-row .gesture-enabled {
@@ -1484,12 +1525,12 @@ input[type='checkbox'] {
   border: 0;
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 14px;
   background: transparent;
   text-align: left;
   flex: 1;
   min-width: 0;
-  padding: 23px 18px;
+  padding: 13px 16px;
 }
 .song-select > span:last-child {
   min-width: 0;
@@ -2037,7 +2078,7 @@ dialog textarea {
     padding: 25px;
   }
   .song-select {
-    padding: 21px 12px;
+    padding: 13px 12px;
     gap: 12px;
   }
 }
@@ -2327,7 +2368,7 @@ dialog textarea {
     font-size: 26px;
   }
   .song-select {
-    padding: 23px 12px;
+    padding: 14px 12px;
   }
   .song-select strong {
     font-size: 13px;

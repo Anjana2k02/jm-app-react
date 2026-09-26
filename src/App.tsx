@@ -1158,6 +1158,35 @@ function Workspace({
                 placeholder={modal === 'document' ? 'Give your song a name' : 'Acoustic favorites'}
               />
             </label>
+            {modal === 'document' &&
+              !editTemplate &&
+              name.trim() &&
+              (() => {
+                const matches = ws.data.documents
+                  .filter((d) => d.title.toLowerCase().includes(name.trim().toLowerCase()))
+                  .slice(0, 5);
+                return matches.length ? (
+                  <div className="dup-list">
+                    <p className="muted dup-hint">Already in your library</p>
+                    {matches.map((d) => (
+                      <button
+                        type="button"
+                        className="dup-row"
+                        key={d.id}
+                        onClick={() => {
+                          setModal(null);
+                          setNewSongSessionId(null);
+                          navigate('documents', d.id);
+                        }}
+                      >
+                        <TypeIcon type={d.song_type} size={15} />
+                        <span>{d.title || 'Untitled'}</span>
+                        {d.artist && <small>{d.artist}</small>}
+                      </button>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
             {modal === 'document' && !editTemplate && songType === 'artist' && (
               <label>
                 Artist name

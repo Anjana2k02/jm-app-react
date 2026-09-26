@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import type { Doc, Op, Session } from './model';
+import { createPdfText } from './pdfText';
 
 type Segment = { text?: string; image?: string; attrs: Record<string, unknown> };
 type Line = { segments: Segment[]; attrs: Record<string, unknown> };
@@ -56,6 +57,15 @@ function formatDate(date: string) {
 
 export async function exportSessionPdf(session: Session, songs: Doc[]) {
   const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+  const text = await createPdfText(pdf, [
+    session.name,
+    session.notes,
+    ...songs.flatMap((song) => [
+      song.title,
+      song.artist ?? '',
+      ...song.content.map((op) => (typeof op.insert === 'string' ? op.insert : '')),
+    ]),
+  ]);
   const pageW = pdf.internal.pageSize.getWidth(),
     pageH = pdf.internal.pageSize.getHeight(),
     margin = 48,
@@ -71,8 +81,12 @@ export async function exportSessionPdf(session: Session, songs: Doc[]) {
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(22);
   pdf.setTextColor(35);
-  pdf.text(session.name || 'Session', margin, y + 20);
-  y += 38;
+  for (const line of text.wrap(session.name || 'Session', width)) {
+    ensure(32);
+    text.draw(line, margin, y + 20);
+    y += 32;
+  }
+  y += 6;
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(10);
   pdf.setTextColor(120);
@@ -82,12 +96,14 @@ export async function exportSessionPdf(session: Session, songs: Doc[]) {
   ]
     .filter(Boolean)
     .join('   ·   ');
-  pdf.text(meta, margin, y);
+  text.draw(meta, margin, y);
   y += 16;
   if (session.notes) {
-    const notes = pdf.splitTextToSize(session.notes, width) as string[];
-    pdf.text(notes, margin, y);
-    y += notes.length * 13;
+    for (const line of text.wrap(session.notes, width)) {
+      ensure(16);
+      text.draw(line, margin, y);
+      y += 16;
+    }
   }
   y += 6;
   pdf.setDrawColor(215);
@@ -96,19 +112,19 @@ export async function exportSessionPdf(session: Session, songs: Doc[]) {
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(13);
   pdf.setTextColor(35);
-  pdf.text('Setlist', margin, y);
+  text.draw('Setlist', margin, y);
   y += 20;
   songs.forEach((song, i) => {
     ensure(17);
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(11);
     pdf.setTextColor(70);
-    pdf.text(
-      `${String(i + 1).padStart(2, '0')}   ${song.title || 'Untitled'}${song.artist ? `   —   ${song.artist}` : ''}`,
-      margin,
-      y,
-    );
-    y += 17;
+    const title = `${String(i + 1).padStart(2, '0')}   ${song.title || 'Untitled'}${song.artist ? `   —   ${song.artist}` : ''}`;
+    for (const line of text.wrap(title, width)) {
+      ensure(18);
+      text.draw(line, margin, y);
+      y += 18;
+    }
   });
 
   for (const [index, song] of songs.entries()) {
@@ -118,14 +134,23 @@ export async function exportSessionPdf(session: Session, songs: Doc[]) {
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(20);
     pdf.setTextColor(35);
-    pdf.text(`${String(index + 1).padStart(2, '0')}   ${song.title || 'Untitled'}`, margin, y + 8);
-    y += 30;
+    for (const line of text.wrap(
+      `${String(index + 1).padStart(2, '0')}   ${song.title || 'Untitled'}`,
+      width,
+    )) {
+      ensure(30);
+      text.draw(line, margin, y + 8);
+      y += 30;
+    }
     if (song.artist) {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(11);
       pdf.setTextColor(120);
-      pdf.text(song.artist, margin, y);
-      y += 16;
+      for (const line of text.wrap(song.artist, width)) {
+        ensure(18);
+        text.draw(line, margin, y);
+        y += 18;
+      }
     }
     pdf.setDrawColor(225);
     pdf.line(margin, y, pageW - margin, y);
@@ -140,7 +165,7 @@ export async function exportSessionPdf(session: Session, songs: Doc[]) {
           pdf.setFont('helvetica', 'italic');
           pdf.setFontSize(10);
           pdf.setTextColor(150);
-          pdf.text('[image could not be embedded]', margin, y);
+          text.draw('[image could not be embedded]', margin, y);
           y += 14;
           continue;
         }
@@ -152,12 +177,12 @@ export async function exportSessionPdf(session: Session, songs: Doc[]) {
         y += h + 8;
       }
 
-      let text = line.segments.map((s) => s.text ?? '').join('');
-      if (!text.trim()) {
+      let content = line.segments.map((s) => s.text ?? '').join('');
+      if (!content.trim()) {
         if (!images.length) y += 7;
         continue;
       }
-      if (line.attrs.list) text = `•  ${text}`;
+      if (line.attrs.list) content = `•  ${content}`;
       const header = Number(line.attrs.header) || 0;
       const mono = line.segments.some((s) =>
         /courier|mono/i.test(String((s.attrs as { font?: unknown }).font ?? '')),
@@ -174,10 +199,10 @@ export async function exportSessionPdf(session: Session, songs: Doc[]) {
       );
       pdf.setFontSize(size);
       pdf.setTextColor(mono ? 80 : 50);
-      const lineHeight = size * 1.45;
-      for (const wrapped of pdf.splitTextToSize(text, width) as string[]) {
+      const lineHeight = size * (/[\u0D80-\u0DFF]/.test(content) ? 1.7 : 1.45);
+      for (const wrapped of text.wrap(content, width)) {
         ensure(lineHeight);
-        pdf.text(wrapped, margin, y);
+        text.draw(wrapped, margin, y);
         y += lineHeight;
       }
     }
@@ -189,7 +214,7 @@ export async function exportSessionPdf(session: Session, songs: Doc[]) {
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(9);
     pdf.setTextColor(160);
-    pdf.text(session.name || 'Session', margin, pageH - 24);
+    text.draw(session.name || 'Session', margin, pageH - 24, width - 60);
     pdf.text(`${page} / ${total}`, pageW - margin, pageH - 24, { align: 'right' });
   }
 
