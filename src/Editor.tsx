@@ -13,7 +13,7 @@ import {
 } from './model';
 import { uploadImage, errorMessage } from './backend';
 import { useWorkspace } from './workspace';
-import { Modal } from './components';
+import { Modal, Snackbar } from './components';
 const Font = Quill.import('attributors/style/font') as { whitelist: string[] };
 Font.whitelist = ['Arial', 'Inter', 'Georgia', 'Times New Roman', 'Courier New', 'monospace'];
 Quill.register('formats/font', Font, true);
@@ -111,6 +111,11 @@ export function Editor({
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [ws.retry]);
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(''), 6000);
+    return () => clearTimeout(timer);
+  }, [error]);
   function insertText(q: Quill, text: string) {
     const range = q.getSelection(true) ?? { index: q.getLength() - 1, length: 0 };
     const delta = new Delta()
@@ -185,9 +190,8 @@ export function Editor({
         />
       </div>
       {error && (
-        <div className="error" role="alert">
-          {error}
-          <button onClick={() => setError('')}>Dismiss</button>
+        <div className="snackbar-region">
+          <Snackbar message={error} onDismiss={() => setError('')} />
         </div>
       )}
       <div className="toolbar-wrap">

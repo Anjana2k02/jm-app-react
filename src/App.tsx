@@ -37,6 +37,7 @@ import {
   SONG_TYPES,
   songTypeMeta,
   TypeIcon,
+  Snackbar,
 } from './components';
 import { Editor } from './Editor';
 import { SessionDetail, SessionForm } from './Sessions';
@@ -290,6 +291,7 @@ function Workspace({
     [query, setQuery] = useState(''),
     [docQuery, setDocQuery] = useState('');
   const [modal, setModal] = useState<'document' | 'template' | null>(null),
+    [newSongSessionId, setNewSongSessionId] = useState<string | null>(null),
     [name, setName] = useState(''),
     [songType, setSongType] = useState<SongType>('song'),
     [artistName, setArtistName] = useState(''),
@@ -323,6 +325,11 @@ function Workspace({
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
   }, []);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(''), 6000);
+    return () => clearTimeout(timer);
+  }, [notice]);
   async function exportPdf(s: Session) {
     setExporting(s.id);
     try {
@@ -370,6 +377,7 @@ function Workspace({
     { id: 'search', label: 'Search', icon: Search },
   ];
   function openCreate(type: 'document' | 'template') {
+    setNewSongSessionId(null);
     setName('');
     setSongType('song');
     setArtistName('');
@@ -419,8 +427,17 @@ function Workspace({
     <>
       {route.page === 'session' && session ? (
         <>
-          <SaveError />
-          <SessionDetail key={session.id} session={session} onBack={() => navigate('sessions')} />
+          <Messages notice={notice} onDismissNotice={() => setNotice('')} />
+          <SessionDetail
+            key={session.id}
+            session={session}
+            onBack={() => navigate('sessions')}
+            onCreateSong={(title) => {
+              openCreate('document');
+              setNewSongSessionId(session.id);
+              setName(title.slice(0, 200));
+            }}
+          />
         </>
       ) : (
         <div
@@ -519,13 +536,7 @@ function Workspace({
                 />
               </div>
             </header>
-            <SaveError />
-            {notice && (
-              <div className="error" role="status">
-                {notice}
-                <button onClick={() => setNotice('')}>Dismiss</button>
-              </div>
-            )}
+            <Messages notice={notice} onDismissNotice={() => setNotice('')} />
             {route.page === 'home' && (
               <main className="page home-page">
                 <div className="page-heading home-actions">
@@ -1075,10 +1086,17 @@ function Workspace({
       {(modal || editTemplate) && (
         <Modal
           title={
-            editTemplate ? 'Rename template' : modal === 'document' ? 'New song' : 'New template'
+            editTemplate
+              ? 'Rename template'
+              : modal === 'document'
+                ? newSongSessionId
+                  ? 'Create new song'
+                  : 'New song'
+                : 'New template'
           }
           onClose={() => {
             setModal(null);
+            setNewSongSessionId(null);
             setEditTemplate(null);
           }}
         >
@@ -1091,13 +1109,22 @@ function Workspace({
                 setEditTemplate(null);
               } else if (modal === 'document') {
                 if (songType === 'artist' && !artistName.trim()) return;
+                if (newSongSessionId && !ws.canManageSessionSongs) return;
                 const doc = ws.createDocument(name, songType, artistName);
+                if (newSongSessionId) {
+                  const ids = ws.data.session_songs
+                    .filter((song) => song.session_id === newSongSessionId)
+                    .sort((a, b) => a.sort_order - b.sort_order)
+                    .map((song) => song.document_id);
+                  ws.setOrder('session', newSongSessionId, [...ids, doc.id]);
+                }
                 navigate('documents', doc.id);
               } else {
                 const t = ws.createTemplate(name);
                 openTemplate(t.id);
               }
               setModal(null);
+              setNewSongSessionId(null);
             }}
           >
             {modal === 'document' && !editTemplate && (
@@ -1155,6 +1182,7 @@ function Workspace({
                 className="button secondary"
                 onClick={() => {
                   setModal(null);
+                  setNewSongSessionId(null);
                   setEditTemplate(null);
                 }}
               >
@@ -1263,17 +1291,21 @@ function Workspace({
 function ArrowRightIcon() {
   return <ChevronRight size={17} />;
 }
-function SaveError() {
+function Messages({ notice, onDismissNotice }: { notice: string; onDismissNotice: () => void }) {
   const ws = useWorkspace();
-  return ws.error ? (
-    <div className="error" role="alert">
-      <span>
-        {ws.pending ? 'Changes have not synced. ' : ''}
-        {ws.error}
-      </span>
-      <button onClick={() => void (ws.pending ? ws.retry() : ws.load())}>Retry</button>
+  if (!ws.error && !notice) return null;
+  return (
+    <div className="snackbar-region">
+      {ws.error && (
+        <Snackbar
+          message={`${ws.pending ? 'Changes have not synced. ' : ''}${ws.error}`}
+          actionLabel="Retry"
+          onAction={() => void (ws.pending ? ws.retry() : ws.load())}
+        />
+      )}
+      {notice && <Snackbar message={notice} onDismiss={onDismissNotice} />}
     </div>
-  ) : null;
+  );
 }
 function SearchResults({
   query,

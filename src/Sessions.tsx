@@ -2,6 +2,8 @@ import { useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowDownAZ,
+  Clock,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
@@ -74,12 +76,21 @@ export function SessionForm({
     </Modal>
   );
 }
-export function SessionDetail({ session, onBack }: { session: Session; onBack: () => void }) {
+export function SessionDetail({
+  session,
+  onBack,
+  onCreateSong,
+}: {
+  session: Session;
+  onBack: () => void;
+  onCreateSong: (title: string) => void;
+}) {
   const ws = useWorkspace(),
     [collapsed, setCollapsed] = useState(false),
     [selected, setSelected] = useState<string | null>(null),
     [adding, setAdding] = useState(false),
     [query, setQuery] = useState(''),
+    [sort, setSort] = useState<'alpha' | 'recent'>('alpha'),
     [checked, setChecked] = useState<string[]>([]);
   const [removed, setRemoved] = useState<{
     id: string;
@@ -96,6 +107,15 @@ export function SessionDetail({ session, onBack }: { session: Session; onBack: (
     index = ids.indexOf(selectedId),
     doc = ws.data.documents.find((d) => d.id === selectedId);
   const nextSong = ws.data.documents.find((d) => d.id === ids[index + 1]);
+  const matchingSongs = ws.data.documents
+    .filter((d) => d.title.toLowerCase().includes(query.toLowerCase()))
+    .sort((a, b) =>
+      sort === 'alpha'
+        ? (a.title || 'Untitled').localeCompare(b.title || 'Untitled', undefined, {
+            sensitivity: 'base',
+          })
+        : b.updated_at.localeCompare(a.updated_at),
+    );
   const { root, live, toggle, gestures } = useLiveMode(Boolean(doc));
   function select(id: string) {
     setSelected(id);
@@ -286,33 +306,52 @@ export function SessionDetail({ session, onBack }: { session: Session; onBack: (
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
+            <button
+              className="icon-button"
+              aria-label={sort === 'alpha' ? 'Sorted A to Z' : 'Sorted by newest'}
+              title={
+                sort === 'alpha'
+                  ? 'Sorted A–Z · tap for newest first'
+                  : 'Sorted by newest · tap for A–Z'
+              }
+              onClick={() => setSort(sort === 'alpha' ? 'recent' : 'alpha')}
+            >
+              {sort === 'alpha' ? <ArrowDownAZ size={18} /> : <Clock size={18} />}
+            </button>
+            <button
+              className="icon-button"
+              aria-label="Create new song"
+              title="Create new song and add it to this session"
+              onClick={() => {
+                setAdding(false);
+                onCreateSong(query.trim());
+              }}
+            >
+              <Plus size={18} />
+            </button>
           </div>
           <div className="song-picker">
-            {ws.data.documents
-              .filter((d) => d.title.toLowerCase().includes(query.toLowerCase()))
-              .map((d) => {
-                const added = ids.includes(d.id);
-                return (
-                  <label className={`picker-row ${added ? 'muted' : ''}`} key={d.id}>
-                    <input
-                      type="checkbox"
-                      disabled={added}
-                      checked={added || checked.includes(d.id)}
-                      onChange={(e) =>
-                        setChecked(
-                          e.target.checked
-                            ? [...checked, d.id]
-                            : checked.filter((id) => id !== d.id),
-                        )
-                      }
-                    />
-                    <span>{d.title || 'Untitled'}</span>
-                    {added && <small>Added</small>}
-                  </label>
-                );
-              })}
-            {!ws.data.documents.length && (
-              <p className="muted">Create a document in your library first.</p>
+            {matchingSongs.map((d) => {
+              const added = ids.includes(d.id);
+              return (
+                <label className={`picker-row ${added ? 'muted' : ''}`} key={d.id}>
+                  <input
+                    type="checkbox"
+                    disabled={added}
+                    checked={added || checked.includes(d.id)}
+                    onChange={(e) =>
+                      setChecked(
+                        e.target.checked ? [...checked, d.id] : checked.filter((id) => id !== d.id),
+                      )
+                    }
+                  />
+                  <span>{d.title || 'Untitled'}</span>
+                  {added && <small>Added</small>}
+                </label>
+              );
+            })}
+            {!matchingSongs.length && (
+              <p className="muted">No songs found. Use + to create a new song for this session.</p>
             )}
           </div>
           <div className="modal-actions">

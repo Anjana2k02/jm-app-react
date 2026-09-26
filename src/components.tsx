@@ -163,6 +163,33 @@ function SortableRow({
     </div>
   );
 }
+export function Snackbar({
+  message,
+  actionLabel,
+  onAction,
+  onDismiss,
+}: {
+  message: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  onDismiss?: () => void;
+}) {
+  return (
+    <div className="snackbar" role="alert">
+      <span>{message}</span>
+      {actionLabel && onAction && (
+        <button className="snackbar-action" onClick={onAction}>
+          {actionLabel}
+        </button>
+      )}
+      {onDismiss && (
+        <button className="snackbar-action" aria-label="Dismiss message" onClick={onDismiss}>
+          <X size={15} />
+        </button>
+      )}
+    </div>
+  );
+}
 export const SONG_TYPES: {
   value: SongType;
   label: string;
