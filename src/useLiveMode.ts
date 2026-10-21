@@ -28,6 +28,9 @@ export function useLiveMode(enabled: boolean) {
     previousFocus.current = document.activeElement as HTMLElement | null;
     setLive(true);
     root.current?.querySelector<HTMLElement>('.song-viewer')?.focus({ preventScroll: true });
+    // Touch browsers show their own persistent swipe-to-exit overlay for native
+    // fullscreen. Use the full-window layout instead, with double-tap to exit.
+    if (navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches) return;
     // Keep the viewport-filling layout when the browser lacks or denies fullscreen.
     try {
       void root.current

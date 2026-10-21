@@ -255,7 +255,7 @@ export function SessionDetail({
           onClick={toggle}
           disabled={!doc}
           aria-pressed={live}
-          title="Show only the song. Double-tap the song area to toggle Live Mode; press Escape to exit."
+          title="Live Mode"
         >
           <Maximize size={18} />
         </button>

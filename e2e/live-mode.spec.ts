@@ -101,12 +101,15 @@ test('Live Mode enters fullscreen, keeps navigation, and toggles without losing 
 test.describe('touch Live Mode', () => {
   test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
 
-  test('double taps toggle the fallback view while swipes and navigation keep it open', async ({
+  test('touch Live Mode avoids native fullscreen hints while double taps and navigation work', async ({
     page,
   }, testInfo) => {
     await page.addInitScript(() => {
-      Element.prototype.requestFullscreen = () =>
-        Promise.reject(new Error('Fullscreen unavailable'));
+      Object.assign(window, { nativeFullscreenRequests: 0 });
+      Element.prototype.requestFullscreen = function () {
+        (window as unknown as { nativeFullscreenRequests: number }).nativeFullscreenRequests++;
+        return Promise.resolve();
+      };
     });
     await openSession(page);
     await page.getByRole('button', { name: 'Expand song panel' }).tap();
@@ -115,6 +118,12 @@ test.describe('touch Live Mode', () => {
     const root = page.locator('.session-detail');
     const content = page.locator('.song-content');
     await expect(root).toHaveClass(/live-mode/);
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { nativeFullscreenRequests: number }).nativeFullscreenRequests,
+      ),
+    ).toBe(0);
+    expect(await page.evaluate(() => document.fullscreenElement)).toBeNull();
     await expect(page.locator('.song-panel')).toBeHidden();
     await expect(page.locator('.live-next-song')).toContainText('Evening Song');
     const bounds = (await root.boundingBox())!;
