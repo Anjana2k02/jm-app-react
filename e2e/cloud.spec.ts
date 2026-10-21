@@ -49,7 +49,14 @@ test('cloud authentication, failed save recovery after reload, and sign out', as
       expect(req.headers().authorization).toBe('Bearer test-access-token');
       if (req.method() === 'HEAD') return route.fulfill({ status: 200 });
       if (req.method() === 'GET') return reply(url.pathname.endsWith('/documents') ? docs : []);
-      if (failWrites) return reply({ message: 'Simulated connection failure', code: 'TEST' }, 503);
+      if (failWrites)
+        return reply(
+          {
+            message: 'new row violates row-level security policy for table "documents"',
+            code: '42501',
+          },
+          403,
+        );
       writes.push(`${req.method()} ${url.pathname}`);
       if (url.pathname.endsWith('/documents')) {
         const rows = req.postDataJSON();
@@ -68,16 +75,23 @@ test('cloud authentication, failed save recovery after reload, and sign out', as
   await page.getByLabel('Password', { exact: true }).fill('test-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByText('Cloud workspace', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'New document', exact: true }).click();
-  await page.getByLabel('Document title', { exact: true }).fill('Cloud Song');
+  await page.getByRole('button', { name: 'New song', exact: true }).click();
+  await page.getByLabel('Name', { exact: true }).fill('Cloud Song');
   await page.getByRole('button', { name: 'Create', exact: true }).click();
   await page.getByRole('textbox', { name: 'Document content' }).fill('Never lose this lyric');
-  await expect(page.getByRole('alert')).toContainText('Simulated connection failure');
+  await expect(page.getByRole('alert')).toContainText('row-level security policy');
+  await expect(page.getByRole('alert')).toBeHidden({ timeout: 4000 });
+  await expect(page.getByRole('status')).toHaveText('Save failed');
+  // The identical error must appear again for a new attempt, then expire again.
+  await page.getByRole('button', { name: 'Save document', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('row-level security policy');
+  await expect(page.getByRole('alert')).toBeHidden({ timeout: 4000 });
+  await expect(page.getByRole('status')).toHaveText('Save failed');
   await page.reload();
   await expect(page.getByRole('textbox', { name: 'Document content' })).toContainText(
     'Never lose this lyric',
   );
-  await expect(page.getByRole('alert')).toContainText('Simulated connection failure');
+  await expect(page.getByRole('alert')).toContainText('row-level security policy');
   failWrites = false;
   await page.getByRole('button', { name: 'Retry', exact: true }).click();
   await expect(page.getByRole('status')).toHaveText('✓ Saved');
@@ -104,11 +118,12 @@ test('cloud authentication, failed save recovery after reload, and sign out', as
     /\/storage\/v1\/object\/public\/doc-images\//,
   );
   expect(imageUploadPath).toContain(`/doc-images/${user.id}/`);
-  await page.getByRole('button', { name: 'New template', exact: true }).click();
+  await page.locator('.sidebar').getByRole('button', { name: 'Templates', exact: true }).click();
+  await page.getByRole('button', { name: 'New template', exact: true }).first().click();
   await page.getByLabel('Template name').fill('Cloud Order');
   await page.getByRole('button', { name: 'Create', exact: true }).click();
   await page.locator('.sidebar').getByRole('button', { name: 'Sessions', exact: true }).click();
-  await page.getByRole('button', { name: 'Create session', exact: true }).first().click();
+  await page.getByRole('button', { name: 'New session', exact: true }).first().click();
   await page.getByLabel('Session name').fill('Cloud Practice');
   await page
     .getByRole('dialog')

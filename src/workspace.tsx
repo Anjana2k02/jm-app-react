@@ -11,12 +11,21 @@ import {
 } from './model';
 import { loadData, localKey, remove, supabase, upsert, errorMessage } from './backend';
 import { write, erase, replay, type Job } from './operations';
+import { useTimedMessage } from './useTimedMessage';
+import { readSongKey, withSongKey } from './songKey';
+import { subscribeWorkspace, type LiveStatus } from './realtime';
 function useWorkspaceState(userId: string, canManageSessionSongs: boolean) {
   const [data, setData] = useState<Data>(emptyData),
     [loading, setLoading] = useState(true),
-    [error, setError] = useState(''),
+    [error, setStoredError] = useState(''),
     [pending, setPending] = useState(0),
     [ready, setReady] = useState(false);
+  const [errorNotice, setErrorNotice] = useTimedMessage();
+  const [liveStatus, setLiveStatus] = useState<LiveStatus>('connecting');
+  function setError(message: string) {
+    setStoredError(message);
+    setErrorNotice(message);
+  }
   const current = useRef(data),
     queue = useRef<Job[]>([]),
     running = useRef(false),
@@ -61,7 +70,7 @@ function useWorkspaceState(userId: string, canManageSessionSongs: boolean) {
       running.current = false;
     }
   }
-  function commit(next: Data, job: Job) {
+  function commit(next: Data, job: Job, immediate = false) {
     update(next);
     // Never replace the in-flight request; coalesce later edits to the same document.
     const start = running.current ? 1 : 0;
@@ -77,7 +86,8 @@ function useWorkspaceState(userId: string, canManageSessionSongs: boolean) {
       );
     }
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => void drain(), 500);
+    if (immediate) void drain();
+    else timer.current = setTimeout(() => void drain(), 500);
   }
   async function load() {
     setLoading(true);
@@ -119,6 +129,18 @@ function useWorkspaceState(userId: string, canManageSessionSongs: boolean) {
     };
   }, [userId]);
   useEffect(() => {
+    if (!supabase || !ready) return;
+    const pendingOperations = () => queue.current.flatMap((job) => job.operations);
+    return subscribeWorkspace(supabase, {
+      load: loadData,
+      snapshot: (snapshot, buffered) =>
+        update(replay(snapshot, [...buffered, ...pendingOperations()])),
+      changes: (operations) =>
+        update(replay(current.current, [...operations, ...pendingOperations()])),
+      status: setLiveStatus,
+    });
+  }, [userId, ready]);
+  useEffect(() => {
     const guard = (e: BeforeUnloadEvent) => {
       if (queue.current.length) {
         e.preventDefault();
@@ -145,10 +167,15 @@ function useWorkspaceState(userId: string, canManageSessionSongs: boolean) {
     );
     return doc;
   }
-  function saveDocument(id: string, changes: { title?: string; content?: Op[] }) {
+  function saveDocument(id: string, changes: { title?: string; content?: Op[]; key?: string }) {
     const prev = current.current.documents.find((d) => d.id === id);
     if (!prev) return;
-    const doc = { ...prev, ...changes, updated_at: stamp() };
+    const { key, ...fields } = changes;
+    const content =
+      prev.song_type !== 'medley' && (key !== undefined || fields.content)
+        ? withSongKey(fields.content ?? prev.content, key ?? readSongKey(prev.content))
+        : (fields.content ?? prev.content);
+    const doc = { ...prev, ...fields, content, updated_at: stamp() };
     commit(
       {
         ...current.current,
@@ -286,6 +313,7 @@ function useWorkspaceState(userId: string, canManageSessionSongs: boolean) {
           ...removed.map((item) => erase(table, column, id, item.document_id)),
         ],
       },
+      kind === 'session',
     );
   }
   function templateDocuments(id: string) {
@@ -308,7 +336,10 @@ function useWorkspaceState(userId: string, canManageSessionSongs: boolean) {
     data,
     loading,
     ready,
+    liveStatus: supabase ? liveStatus : null,
     error,
+    errorNotice,
+    dismissError: () => setErrorNotice(''),
     pending,
     userId,
     canManageSessionSongs,

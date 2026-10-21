@@ -1,3 +1,4 @@
+import { medleyPages } from './medley';
 import { jsPDF } from 'jspdf';
 import type { Doc, Op, Session } from './model';
 import { createPdfText } from './pdfText';
@@ -56,11 +57,12 @@ function formatDate(date: string) {
 }
 
 export async function exportSessionPdf(session: Session, songs: Doc[]) {
+  const pages = songs.flatMap(medleyPages);
   const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
   const text = await createPdfText(pdf, [
     session.name,
     session.notes,
-    ...songs.flatMap((song) => [
+    ...pages.flatMap((song) => [
       song.title,
       song.artist ?? '',
       ...song.content.map((op) => (typeof op.insert === 'string' ? op.insert : '')),
@@ -127,7 +129,9 @@ export async function exportSessionPdf(session: Session, songs: Doc[]) {
     }
   });
 
-  for (const [index, song] of songs.entries()) {
+  for (const [index, song] of songs.flatMap((entry, index) =>
+    medleyPages(entry).map((page) => [index, page] as const),
+  )) {
     // Every song starts on a fresh page; the first page stays as the cover.
     pdf.addPage();
     y = margin;

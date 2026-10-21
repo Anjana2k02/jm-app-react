@@ -1,16 +1,24 @@
+import { useTimedMessage } from './useTimedMessage';
 import { useState } from 'react';
 import { checkConnection, errorMessage, projectUrl } from './backend';
 
 export function ConnectionStatus() {
   const [results, setResults] = useState<Awaited<ReturnType<typeof checkConnection>>>([]);
   const [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useTimedMessage();
   async function check() {
     setBusy(true);
     setError('');
     setResults([]);
     try {
-      setResults(await checkConnection());
+      const checks = await checkConnection();
+      setResults(checks.filter((result) => result.ok));
+      setError(
+        checks
+          .filter((result) => !result.ok)
+          .map((result) => `${result.name}: ${result.detail}`)
+          .join(' '),
+      );
     } catch (e) {
       setError(errorMessage(e));
     } finally {

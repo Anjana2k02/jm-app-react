@@ -1,3 +1,4 @@
+import { useTimedMessage } from './useTimedMessage';
 import { useEffect, useState, type FormEvent } from 'react';
 import {
   Home,
@@ -23,6 +24,7 @@ import {
   EyeOff,
   Crown,
   MoreVertical,
+  SlidersHorizontal,
   FileDown,
 } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
@@ -166,7 +168,7 @@ function Auth({ initialError }: { initialError: string }) {
     [password, setPassword] = useState(''),
     [visible, setVisible] = useState(false),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState(initialError),
+    [error, setError] = useTimedMessage(initialError),
     [message, setMessage] = useState('');
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -290,6 +292,7 @@ function Workspace({
     [templateId, setTemplateId] = useState(''),
     [query, setQuery] = useState(''),
     [docQuery, setDocQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<SongType | 'all'>('all');
   const [modal, setModal] = useState<'document' | 'template' | null>(null),
     [newSongSessionId, setNewSongSessionId] = useState<string | null>(null),
     [name, setName] = useState(''),
@@ -302,7 +305,7 @@ function Workspace({
     [editTemplate, setEditTemplate] = useState<string | null>(null),
     [deleteTemplate, setDeleteTemplate] = useState<string | null>(null);
   const [theme, setTheme] = useState(() => localStorage.getItem('jammer-theme') ?? 'system'),
-    [notice, setNotice] = useState('');
+    [notice, setNotice] = useTimedMessage();
   useEffect(() => {
     const handler = () => {
       setRoute(readRoute());
@@ -325,11 +328,6 @@ function Workspace({
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
   }, []);
-  useEffect(() => {
-    if (!notice) return;
-    const timer = setTimeout(() => setNotice(''), 6000);
-    return () => clearTimeout(timer);
-  }, [notice]);
   async function exportPdf(s: Session) {
     setExporting(s.id);
     try {
@@ -348,7 +346,8 @@ function Workspace({
   }
   const docs = ws
       .templateDocuments(templateId)
-      .filter((d) => d.title.toLowerCase().includes(docQuery.toLowerCase())),
+      .filter((d) => d.title.toLowerCase().includes(docQuery.toLowerCase()))
+      .filter((d) => typeFilter === 'all' || (d.song_type ?? 'song') === typeFilter),
     selected = ws.data.documents.find((d) => d.id === route.id),
     session = ws.data.sessions.find((s) => s.id === route.id);
   const now = new Date(),
@@ -416,7 +415,7 @@ function Workspace({
         <div className="auth-card">
           <Logo />
           <h1>Could not load your workspace</h1>
-          <p role="alert">{ws.error}</p>
+          {ws.errorNotice && <p role="alert">{ws.errorNotice}</p>}
           <button className="button" onClick={() => void ws.load()}>
             Retry loading
           </button>
@@ -750,32 +749,33 @@ function Workspace({
                       <Plus size={21} />
                     </button>
                   </div>
-                  <label className="view-select">
-                    VIEW
-                    <select
-                      aria-label="Template view"
-                      value={templateId}
-                      onChange={(e) => setTemplateId(e.target.value)}
-                    >
-                      <option value="">All songs</option>
-                      {ws.data.templates.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="search-field">
-                    <Search size={16} />
-                    <input
-                      aria-label="Filter songs"
-                      placeholder="Search…"
-                      value={docQuery}
-                      onChange={(e) => setDocQuery(e.target.value)}
-                    />
+                  <div className="song-list-controls">
+                    <div className={`song-type-filter ${typeFilter !== 'all' ? 'active' : ''}`}>
+                      <SlidersHorizontal size={18} aria-hidden="true" />
+                      <select
+                        aria-label="Filter by song type"
+                        title={`Type: ${typeFilter === 'all' ? 'All' : typeFilter === 'song' ? 'Songs' : typeFilter === 'medley' ? 'Medleys' : 'Artist'}`}
+                        value={typeFilter}
+                        onChange={(e) => setTypeFilter(e.target.value as SongType | 'all')}
+                      >
+                        <option value="all">All</option>
+                        <option value="song">Songs</option>
+                        <option value="medley">Medleys</option>
+                        <option value="artist">Artist</option>
+                      </select>
+                    </div>
+                    <div className="search-field">
+                      <Search size={16} />
+                      <input
+                        aria-label="Filter songs"
+                        placeholder="Search?"
+                        value={docQuery}
+                        onChange={(e) => setDocQuery(e.target.value)}
+                      />
+                    </div>
                   </div>
                   <div className="document-list">
-                    {templateId && !docQuery ? (
+                    {templateId && !docQuery && typeFilter === 'all' ? (
                       <SortableList
                         ids={docs.map((d) => d.id)}
                         onReorder={(ids) => ws.setOrder('template', templateId, ids)}
@@ -805,7 +805,9 @@ function Workspace({
                         </button>
                       ))
                     )}
-                    {!docs.length && docQuery && <p className="muted panel-hint">No matches.</p>}
+                    {!docs.length && (docQuery || typeFilter !== 'all') && (
+                      <p className="muted panel-hint">No matches.</p>
+                    )}
                   </div>
                   <button
                     className="button secondary"
@@ -1322,12 +1324,13 @@ function ArrowRightIcon() {
 }
 function Messages({ notice, onDismissNotice }: { notice: string; onDismissNotice: () => void }) {
   const ws = useWorkspace();
-  if (!ws.error && !notice) return null;
+  if (!ws.errorNotice && !notice) return null;
   return (
     <div className="snackbar-region">
-      {ws.error && (
+      {ws.errorNotice && (
         <Snackbar
-          message={`${ws.pending ? 'Changes have not synced. ' : ''}${ws.error}`}
+          message={`${ws.pending ? 'Changes have not synced. ' : ''}${ws.errorNotice}`}
+          onDismiss={ws.dismissError}
           actionLabel="Retry"
           onAction={() => void (ws.pending ? ws.retry() : ws.load())}
         />

@@ -96,6 +96,7 @@ export function chordDelta(text: string): Op[] {
 export function browserDelta(ops: Op[]): Op[] {
   return ops.map((op) => {
     const a = { ...op.attributes };
+    delete a.songKey;
     if (a.size && /^\d+(\.\d+)?$/.test(String(a.size))) a.size = `${a.size}px`;
     if (a.list === 'checked' || a.list === 'unchecked') a.list = String(a.list);
     return { ...op, ...(op.attributes ? { attributes: a } : {}) };

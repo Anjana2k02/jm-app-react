@@ -101,7 +101,7 @@ Sign out and sign back in after assigning a role so the app receives the updated
 - Templates store an independent document order. New documents remain visible in every template. Templates can be created, renamed, deleted, and reordered.
 - Search titles, document text, session names/notes, and templates. Ctrl/Cmd+K opens search.
 - Create/edit/delete dated sessions with notes; searchable multi-select song picker prevents duplicates; remove songs and persist setlist ordering.
-- Focused read-only session viewer with Previous/Next boundaries, song count, independently scrolling content, a 60% desktop song panel, collapsed rail, and mobile drawer.
+- Focused read-only session viewer with compact Previous/Next controls, the current key, song count, independently scrolling content, and a narrow desktop setlist. On mobile the setlist starts closed and opens from the header icon. Live Mode uses a single compact control row to maximize space for lyrics and chords.
 - **Live Mode** beside the session name fills the screen with the song, Previous/Next controls, and the next song title at the top right. Double-tap (or double-click) the song area to exit or enter again; Escape also exits. The selected song, scroll position, and setlist panel state are preserved when toggling. Browsers without native fullscreen support use a full-window view; installed home-screen apps already run in their own window. See [Fullscreen API support](https://developer.mozilla.org/en-US/docs/Web/API/Element/requestFullscreen).
 - Admin-only session song gestures: swipe left to remove with Undo, hold one second to reorder, or use Ctrl+Up/Down and Delete on a focused song card. Reordering preserves the selected song. Template lists retain their existing drag grips and keyboard controls.
 - Light/dark/system appearance, native modal focus management and Escape dismissal, reduced-motion styling.
@@ -131,3 +131,11 @@ Quill 2.0.3 has an outstanding [HTML-export advisory](https://github.com/advisor
 - [Quill toolbar](https://quilljs.com/docs/modules/toolbar) and [clipboard](https://quilljs.com/docs/modules/clipboard).
 - [Supabase password authentication](https://supabase.com/docs/guides/auth/passwords).
 - [Vite guide](https://vite.dev/guide/).
+
+### Live session updates
+
+Run [supabase/session-realtime.sql](supabase/session-realtime.sql) in the Supabase SQL editor to add `session_songs`, `sessions`, and `documents` to the Realtime publication. Keep the existing SELECT policies and admin-only write policies enabled. This repository does not apply SQL to the hosted database automatically.
+
+Signed-in clients receive committed changes over a Supabase Realtime WebSocket and apply the row payloads directly, without polling or fetching after each reorder. Session setlist writes start immediately instead of waiting for the editor's 500 ms debounce. Small batches of row events are rendered together after 25 ms. Viewers see ?Session updated? for three seconds and retain their currently selected song during a reorder, including Live Mode/fullscreen.
+
+Joining, reconnecting, or returning to a backgrounded app fetches a fresh snapshot; changes arriving during that fetch are buffered and unsynced local edits are reapplied. A connection indicator is visible while recovering. This is near-real-time, not a zero-latency guarantee: delivery still depends on the database commit, network, and Realtime service. Local-only mode has no cross-device sync. Verify the migration and SELECT permissions with two signed-in accounts before using it live.

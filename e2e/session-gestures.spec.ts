@@ -84,6 +84,7 @@ async function openCloudSession(page: Page, admin: boolean) {
   await page.evaluate(() => {
     location.hash = 'session/session-1';
   });
+  await page.getByRole('button', { name: 'Expand song panel' }).click();
   await expect(page.locator('.song-select')).toHaveCount(3);
   return { mutations, documents };
 }
@@ -151,6 +152,7 @@ test('admins swipe to remove only the session entry, undo, and hold one second t
     .poll(() => mutations.filter((m) => m === 'POST session_songs').length)
     .toBeGreaterThanOrEqual(3);
   await page.reload();
+  await page.getByRole('button', { name: 'Expand song panel' }).click();
   await expect(page.locator('.song-select strong')).toHaveText([
     'Third Song',
     'First Song',

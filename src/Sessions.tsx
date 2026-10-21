@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -11,11 +11,14 @@ import {
   Maximize,
 } from 'lucide-react';
 import { useWorkspace } from './workspace';
-import { Empty, Modal } from './components';
+import { Empty, Modal, Snackbar } from './components';
+import { useTimedMessage } from './useTimedMessage';
 import { SessionSongList } from './SessionSongList';
 import { RichViewer } from './Editor';
 import type { Session } from './model';
 import { useLiveMode } from './useLiveMode';
+import { medleySongs } from './medley';
+import { readSongKey } from './songKey';
 export function SessionForm({
   session,
   onClose,
@@ -86,9 +89,11 @@ export function SessionDetail({
   onCreateSong: (title: string) => void;
 }) {
   const ws = useWorkspace(),
-    [collapsed, setCollapsed] = useState(false),
+    [collapsed, setCollapsed] = useState(() => window.innerWidth < 760),
     [selected, setSelected] = useState<string | null>(null),
     [adding, setAdding] = useState(false),
+    [addMode, setAddMode] = useState<'songs' | 'templates'>('songs'),
+    [selectedTemplate, setSelectedTemplate] = useState(''),
     [query, setQuery] = useState(''),
     [sort, setSort] = useState<'alpha' | 'recent'>('alpha'),
     [checked, setChecked] = useState<string[]>([]);
@@ -106,7 +111,52 @@ export function SessionDetail({
   const selectedId = selected && ids.includes(selected) ? selected : ids[0],
     index = ids.indexOf(selectedId),
     doc = ws.data.documents.find((d) => d.id === selectedId);
-  const nextSong = ws.data.documents.find((d) => d.id === ids[index + 1]);
+  const [medleyPage, setMedleyPage] = useState({ documentId: '', page: 0 });
+  const pages = ids.flatMap((id) => {
+    const item = ws.data.documents.find((entry) => entry.id === id)!;
+    return item.song_type === 'medley'
+      ? medleySongs(item).map((song, page) => ({
+          documentId: id,
+          page,
+          title: song.name || 'Untitled song',
+          key: song.key,
+        }))
+      : [
+          {
+            documentId: id,
+            page: 0,
+            title: item.title || 'Untitled',
+            key: readSongKey(item.content),
+          },
+        ];
+  });
+  const requestedPage = medleyPage.documentId === doc?.id ? medleyPage.page : 0;
+  const documentPages = pages.filter((page) => page.documentId === doc?.id);
+  const currentPage = Math.min(requestedPage, Math.max(0, documentPages.length - 1));
+  const pageIndex = pages.findIndex(
+    (page) => page.documentId === doc?.id && page.page === currentPage,
+  );
+  const currentKey = pages[pageIndex]?.key ?? '';
+  const nextSong = pages[pageIndex + 1];
+  function navigateSong(direction: -1 | 1) {
+    const target = pages[pageIndex + direction];
+    if (!target) return;
+    setSelected(target.documentId);
+    setMedleyPage({ documentId: target.documentId, page: target.page });
+  }
+  // Anchor the current song by ID, including the initially selected first song.
+  useEffect(() => {
+    setSelected(selectedId ?? null);
+  }, [selectedId]);
+  const [notice, setNotice] = useTimedMessage();
+  const signature = JSON.stringify([session.name, session.notes, session.session_date, ids]);
+  const previous = useRef(signature);
+  useEffect(() => {
+    if (previous.current !== signature) {
+      previous.current = signature;
+      setNotice('Session updated');
+    }
+  }, [signature, setNotice]);
   const matchingSongs = ws.data.documents
     .filter((d) => d.title.toLowerCase().includes(query.toLowerCase()))
     .sort((a, b) =>
@@ -117,8 +167,34 @@ export function SessionDetail({
         : b.updated_at.localeCompare(a.updated_at),
     );
   const { root, live, toggle, gestures } = useLiveMode(Boolean(doc));
+  function openAddSongs() {
+    setChecked([]);
+    setQuery('');
+    setAddMode('songs');
+    setSelectedTemplate('');
+    setAdding(true);
+  }
+  // Only explicit template members belong in an import. The library template
+  // view also appends other workspace documents, so it cannot be used here.
+  function templateSongIds(templateId: string) {
+    return [
+      ...new Set(
+        ws.data.template_items
+          .filter((item) => item.template_id === templateId)
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map((item) => item.document_id),
+      ),
+    ].filter((id) => ws.data.documents.some((song) => song.id === id));
+  }
+  const matchingTemplates = ws.data.templates
+    .filter((template) => template.name.toLowerCase().includes(query.toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const songsToAdd = (addMode === 'templates' ? templateSongIds(selectedTemplate) : checked).filter(
+    (id) => !ids.includes(id) && ws.data.documents.some((song) => song.id === id),
+  );
   function select(id: string) {
     setSelected(id);
+    setMedleyPage({ documentId: id, page: 0 });
     if (window.innerWidth < 760) setCollapsed(true);
   }
   function removeSong(id: string) {
@@ -141,19 +217,47 @@ export function SessionDetail({
   }
   return (
     <div ref={root} className={`session-detail ${live ? 'live-mode' : ''}`}>
+      {notice && (
+        <div className="snackbar-region">
+          <Snackbar message={notice} onDismiss={() => setNotice('')} />
+        </div>
+      )}
+      {ws.liveStatus && ws.liveStatus !== 'live' && (
+        <div className="session-connection" role="status">
+          {ws.liveStatus === 'connecting'
+            ? 'Connecting to live updates…'
+            : 'Reconnecting to live updates…'}
+        </div>
+      )}
       <header className="session-header">
-        <button className="button ghost" onClick={onBack}>
-          <ArrowLeft size={19} /> Back
+        <button
+          className="button ghost"
+          aria-label="Back"
+          title="Back to sessions"
+          onClick={onBack}
+        >
+          <ArrowLeft size={19} />
         </button>
+        {collapsed && (
+          <button
+            className="icon-button"
+            aria-label="Expand song panel"
+            title="Show setlist"
+            onClick={() => setCollapsed(false)}
+          >
+            <PanelLeftOpen size={20} />
+          </button>
+        )}
         <h1>{session.name}</h1>
         <button
           className="button secondary live-mode-button"
+          aria-label="Live Mode"
           onClick={toggle}
           disabled={!doc}
           aria-pressed={live}
           title="Show only the song. Double-tap the song area to toggle Live Mode; press Escape to exit."
         >
-          <Maximize size={16} /> Live Mode
+          <Maximize size={18} />
         </button>
       </header>
       <div className={`session-layout ${collapsed ? 'collapsed' : ''}`}>
@@ -165,15 +269,7 @@ export function SessionDetail({
           />
         )}
         <aside className="song-panel">
-          {collapsed ? (
-            <button
-              className="icon-button expand-panel"
-              onClick={() => setCollapsed(false)}
-              aria-label="Expand song panel"
-            >
-              <PanelLeftOpen size={22} />
-            </button>
-          ) : (
+          {!collapsed && (
             <>
               <div className="section-heading">
                 <h2>
@@ -188,15 +284,7 @@ export function SessionDetail({
                 </button>
               </div>
               {ws.canManageSessionSongs && (
-                <button
-                  className="button"
-                  onClick={() => {
-                    setChecked([]);
-                    setQuery('');
-                    setAdding(true);
-                  }}
-                  aria-label="Add songs"
-                >
+                <button className="button" onClick={openAddSongs} aria-label="Add songs">
                   <Plus size={18} />
                 </button>
               )}
@@ -249,45 +337,53 @@ export function SessionDetail({
         </aside>
         <main className="song-viewer" tabIndex={-1} aria-label="Session song viewer" {...gestures}>
           <div className="song-navigation">
-            {live && (
-              <div className="live-next-song" aria-live="polite">
-                <span>{nextSong ? 'UP NEXT' : 'SETLIST'}</span>
-                <strong>{nextSong ? nextSong.title || 'Untitled' : 'Last song'}</strong>
-              </div>
-            )}
             <button
               className="button secondary"
-              disabled={index <= 0}
-              onClick={() => setSelected(ids[index - 1])}
+              aria-label="Previous"
+              title="Previous song"
+              disabled={pageIndex <= 0}
+              onClick={() => navigateSong(-1)}
             >
-              <ArrowLeft size={18} /> Previous
+              <ArrowLeft size={18} />
             </button>
-            <span>{ids.length ? `${index + 1} / ${ids.length}` : '0 songs'}</span>
+            <div className="song-navigation-center" aria-live="polite">
+              {doc && <strong className="song-key-display">Key: {currentKey || 'Not set'}</strong>}
+              <span>{pages.length ? `${pageIndex + 1} / ${pages.length}` : '0 songs'}</span>
+              {doc && (
+                <div className="live-next-song" aria-live="polite">
+                  <span>{nextSong ? 'UP NEXT' : 'SETLIST'}</span>
+                  <strong>{nextSong ? nextSong.title || 'Untitled' : 'Last song'}</strong>
+                  {nextSong && (
+                    <small className="up-next-key">Key: {nextSong.key || 'Not set'}</small>
+                  )}
+                </div>
+              )}
+            </div>
             <button
               className="button secondary"
-              disabled={index < 0 || index >= ids.length - 1}
-              onClick={() => setSelected(ids[index + 1])}
+              aria-label="Next"
+              title={
+                nextSong
+                  ? `Next: ${nextSong.title} · Key: ${nextSong.key || 'Not set'}`
+                  : 'Last song'
+              }
+              disabled={pageIndex < 0 || pageIndex >= pages.length - 1}
+              onClick={() => navigateSong(1)}
             >
-              Next <ArrowRight size={18} />
+              <ArrowRight size={18} />
             </button>
           </div>
           {doc ? (
-            <div className="song-content" key={doc.id}>
-              <h1>{doc.title || 'Untitled'}</h1>
-              <RichViewer doc={doc} />
+            <div className="song-content" key={`${doc.id}/${currentPage}`}>
+              <h1 title={doc.song_type === 'medley' ? doc.title : undefined}>
+                {pages[pageIndex]?.title || doc.title || 'Untitled'}
+              </h1>
+              <RichViewer doc={doc} page={currentPage} />
             </div>
           ) : (
             <Empty>
               {ws.canManageSessionSongs && (
-                <button
-                  className="button"
-                  onClick={() => {
-                    setChecked([]);
-                    setQuery('');
-                    setAdding(true);
-                  }}
-                  aria-label="Add songs"
-                >
+                <button className="button" onClick={openAddSongs} aria-label="Add songs">
                   <Plus size={18} />
                 </button>
               )}
@@ -297,77 +393,151 @@ export function SessionDetail({
       </div>
       {adding && ws.canManageSessionSongs && (
         <Modal title="Add songs" onClose={() => setAdding(false)}>
+          <div className="add-source-toggle" role="group" aria-label="Add from">
+            <button
+              type="button"
+              aria-pressed={addMode === 'songs'}
+              onClick={() => {
+                setAddMode('songs');
+                setQuery('');
+              }}
+            >
+              Songs
+            </button>
+            <button
+              type="button"
+              aria-pressed={addMode === 'templates'}
+              onClick={() => {
+                setAddMode('templates');
+                setQuery('');
+              }}
+            >
+              Templates
+            </button>
+          </div>
           <div className="search-field">
             <Search size={18} />
             <input
               autoFocus
-              aria-label="Search songs"
-              placeholder="Search your songs…"
+              aria-label={addMode === 'songs' ? 'Search songs' : 'Search templates'}
+              placeholder={addMode === 'songs' ? 'Search your songs…' : 'Search templates…'}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <button
-              className="icon-button"
-              aria-label={sort === 'alpha' ? 'Sorted A to Z' : 'Sorted by newest'}
-              title={
-                sort === 'alpha'
-                  ? 'Sorted A–Z · tap for newest first'
-                  : 'Sorted by newest · tap for A–Z'
-              }
-              onClick={() => setSort(sort === 'alpha' ? 'recent' : 'alpha')}
-            >
-              {sort === 'alpha' ? <ArrowDownAZ size={18} /> : <Clock size={18} />}
-            </button>
-            <button
-              className="icon-button"
-              aria-label="Create new song"
-              title="Create new song and add it to this session"
-              onClick={() => {
-                setAdding(false);
-                onCreateSong(query.trim());
-              }}
-            >
-              <Plus size={18} />
-            </button>
-          </div>
-          <div className="song-picker">
-            {matchingSongs.map((d) => {
-              const added = ids.includes(d.id);
-              return (
-                <label className={`picker-row ${added ? 'muted' : ''}`} key={d.id}>
-                  <input
-                    type="checkbox"
-                    disabled={added}
-                    checked={added || checked.includes(d.id)}
-                    onChange={(e) =>
-                      setChecked(
-                        e.target.checked ? [...checked, d.id] : checked.filter((id) => id !== d.id),
-                      )
-                    }
-                  />
-                  <span>{d.title || 'Untitled'}</span>
-                  {added && <small>Added</small>}
-                </label>
-              );
-            })}
-            {!matchingSongs.length && (
-              <p className="muted">No songs found. Use + to create a new song for this session.</p>
+            {addMode === 'songs' && (
+              <>
+                <button
+                  className="icon-button"
+                  aria-label={sort === 'alpha' ? 'Sorted A to Z' : 'Sorted by newest'}
+                  title={
+                    sort === 'alpha'
+                      ? 'Sorted A–Z · tap for newest first'
+                      : 'Sorted by newest · tap for A–Z'
+                  }
+                  onClick={() => setSort(sort === 'alpha' ? 'recent' : 'alpha')}
+                >
+                  {sort === 'alpha' ? <ArrowDownAZ size={18} /> : <Clock size={18} />}
+                </button>
+                <button
+                  className="icon-button"
+                  aria-label="Create new song"
+                  title="Create new song and add it to this session"
+                  onClick={() => {
+                    setAdding(false);
+                    onCreateSong(query.trim());
+                  }}
+                >
+                  <Plus size={18} />
+                </button>
+              </>
             )}
           </div>
+          <div className="song-picker">
+            {addMode === 'songs' ? (
+              <>
+                {matchingSongs.map((d) => {
+                  const added = ids.includes(d.id);
+                  return (
+                    <label className={`picker-row ${added ? 'muted' : ''}`} key={d.id}>
+                      <input
+                        type="checkbox"
+                        disabled={added}
+                        checked={added || checked.includes(d.id)}
+                        onChange={(e) =>
+                          setChecked(
+                            e.target.checked
+                              ? [...checked, d.id]
+                              : checked.filter((id) => id !== d.id),
+                          )
+                        }
+                      />
+                      <span>{d.title || 'Untitled'}</span>
+                      {added && <small>Added</small>}
+                    </label>
+                  );
+                })}
+                {!matchingSongs.length && (
+                  <p className="muted">
+                    No songs found. Use + to create a new song for this session.
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                {matchingTemplates.map((template) => {
+                  const members = templateSongIds(template.id);
+                  const newCount = members.filter((id) => !ids.includes(id)).length;
+                  return (
+                    <label className={`picker-row ${!newCount ? 'muted' : ''}`} key={template.id}>
+                      <input
+                        type="radio"
+                        name="session-template"
+                        value={template.id}
+                        checked={selectedTemplate === template.id}
+                        disabled={!newCount}
+                        onChange={() => setSelectedTemplate(template.id)}
+                      />
+                      <span>{template.name}</span>
+                      <small>
+                        {!members.length
+                          ? 'Empty template'
+                          : !newCount
+                            ? 'Already added'
+                            : `${newCount} to add · ${members.length} songs`}
+                      </small>
+                    </label>
+                  );
+                })}
+                {!matchingTemplates.length && (
+                  <p className="muted">
+                    {ws.data.templates.length
+                      ? 'No templates found.'
+                      : 'No templates yet. Create a template in your library first.'}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+          {addMode === 'templates' && (
+            <p className="muted template-import-hint">
+              Adds songs in template order. Songs already in this session are skipped.
+            </p>
+          )}
           <div className="modal-actions">
             <button className="button secondary" onClick={() => setAdding(false)}>
               Cancel
             </button>
             <button
               className="button"
-              disabled={!checked.length}
+              disabled={!songsToAdd.length}
               onClick={() => {
-                ws.setOrder('session', session.id, [...ids, ...checked]);
-                if (!selectedId) setSelected(checked[0]);
+                if (!songsToAdd.length) return;
+                ws.setOrder('session', session.id, [...ids, ...songsToAdd]);
+                if (!selectedId) setSelected(songsToAdd[0]);
                 setAdding(false);
               }}
             >
-              Add {checked.length || ''} {checked.length === 1 ? 'song' : 'songs'}
+              Add {songsToAdd.length || ''} {songsToAdd.length === 1 ? 'song' : 'songs'}
             </button>
           </div>
         </Modal>

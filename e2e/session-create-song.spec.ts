@@ -46,6 +46,7 @@ for (const mobile of [false, true]) {
       );
     });
     await page.goto('/#session/practice');
+    if (mobile) await page.getByRole('button', { name: 'Expand song panel' }).click();
     await page.getByRole('button', { name: 'Add songs', exact: true }).click();
     await expect(page.getByRole('checkbox', { name: /Existing Song/ })).toBeDisabled();
     await page.getByRole('textbox', { name: 'Search songs' }).fill('Brand New Song');
@@ -64,12 +65,14 @@ for (const mobile of [false, true]) {
     await form.getByRole('button', { name: 'Create', exact: true }).click();
     await page.getByRole('textbox', { name: 'Document content' }).fill('New lyrics for practice');
     await page.goto('/#session/practice');
+    if (mobile) await page.getByRole('button', { name: 'Expand song panel' }).click();
     await expect(page.locator('.song-select')).toHaveCount(2);
     await expect(page.locator('.song-select').nth(0)).toContainText('Existing Song');
     await expect(page.locator('.song-select').nth(1)).toContainText('Brand New Song');
     await page.locator('.song-select').nth(1).click();
     await expect(page.locator('.song-content')).toContainText('New lyrics for practice');
     await page.reload();
+    if (mobile) await page.getByRole('button', { name: 'Expand song panel' }).click();
     await expect(page.locator('.song-select')).toHaveCount(2);
     await page.locator('.song-select').nth(1).click();
     await expect(page.locator('.song-content')).toContainText('New lyrics for practice');

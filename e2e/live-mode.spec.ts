@@ -109,6 +109,7 @@ test.describe('touch Live Mode', () => {
         Promise.reject(new Error('Fullscreen unavailable'));
     });
     await openSession(page);
+    await page.getByRole('button', { name: 'Expand song panel' }).tap();
     await page.locator('.song-select').first().tap();
     await page.getByRole('button', { name: 'Live Mode' }).tap();
     const root = page.locator('.session-detail');

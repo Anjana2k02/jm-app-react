@@ -15,7 +15,8 @@ export const erase = (
   documentId?: string,
 ): Operation => ({ action: 'remove', table, column, id, documentId });
 export function replay(data: Data, operations: Operation[]): Data {
-  let next = structuredClone(data);
+  // Retain untouched document references so live reorders preserve viewer scroll.
+  let next = { ...data };
   for (const op of operations) {
     const rows = next[op.table] as unknown as Record<string, unknown>[];
     if (op.action === 'upsert') {

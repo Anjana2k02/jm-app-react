@@ -1,6 +1,18 @@
+import { medleySongs, medleyContent, type MedleySong } from './medley';
+import { readSongKey } from './songKey';
+import { useTimedMessage } from './useTimedMessage';
 import { useEffect, useRef, useState } from 'react';
 import Quill, { Delta } from 'quill';
-import { ClipboardPaste, ImagePlus, Undo2, Redo2, Save, Trash2, ArrowLeft } from 'lucide-react';
+import {
+  ClipboardPaste,
+  ImagePlus,
+  Undo2,
+  Redo2,
+  Save,
+  Trash2,
+  ArrowLeft,
+  Plus,
+} from 'lucide-react';
 import 'quill/dist/quill.snow.css';
 import {
   browserDelta,
@@ -23,7 +35,17 @@ Size.whitelist = ['8', '10', '12', '14', '16', '18', '20', '24', '28', '32', '36
 );
 Quill.register('formats/size', Size, true);
 
-export function RichViewer({ doc }: { doc: Doc }) {
+export function RichViewer({ doc, page = 0 }: { doc: Doc; page?: number }) {
+  if (doc.song_type !== 'medley') return <SongViewer doc={doc} />;
+  const songs = medleySongs(doc);
+  const song = songs[Math.min(page, songs.length - 1)];
+  return (
+    <div>
+      <SongViewer key={`${doc.id}/${song.id}`} doc={{ ...doc, content: song.content }} />
+    </div>
+  );
+}
+function SongViewer({ doc }: { doc: Doc }) {
   const host = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!host.current) return;
@@ -39,25 +61,121 @@ export function RichViewer({ doc }: { doc: Doc }) {
   }, [doc.id, doc.content]);
   return <div className="rich-viewer" ref={host} />;
 }
-export function Editor({
+type EditorProps = { doc: Doc; onBack: () => void; onDelete: () => void };
+export function Editor(props: EditorProps) {
+  return props.doc.song_type === 'medley' ? <MedleyEditor {...props} /> : <SongEditor {...props} />;
+}
+function MedleyEditor({ doc, onBack, onDelete }: EditorProps) {
+  const ws = useWorkspace();
+  const [page, setPage] = useState(0);
+  const songs = medleySongs(doc);
+  const latest = useRef(songs);
+  latest.current = songs;
+  const index = Math.min(page, songs.length - 1);
+  const song = songs[index];
+  function update(changes: Partial<MedleySong>) {
+    const next = latest.current.map((entry) =>
+      entry.id === song.id ? { ...entry, ...changes } : entry,
+    );
+    latest.current = next;
+    ws.saveDocument(doc.id, { content: medleyContent(next) });
+  }
+  return (
+    <div className="medley-editor">
+      <div className="medley-header">
+        <label>
+          Medley name
+          <input
+            aria-label="Medley name"
+            value={doc.title}
+            onChange={(e) =>
+              ws.saveDocument(doc.id, {
+                title: e.target.value,
+                content: medleyContent(latest.current),
+              })
+            }
+          />
+        </label>
+        <nav className="medley-navigation" aria-label="Medley pages">
+          <button
+            className="button secondary"
+            disabled={index === 0}
+            onClick={() => setPage(index - 1)}
+          >
+            Previous song
+          </button>
+          <span>
+            Song {index + 1} of {songs.length}
+          </span>
+          <button
+            className="button secondary"
+            disabled={index === songs.length - 1}
+            onClick={() => setPage(index + 1)}
+          >
+            Next song
+          </button>
+          <button
+            className="button"
+            onClick={() => {
+              const next = [
+                ...latest.current,
+                { id: crypto.randomUUID(), name: '', key: '', content: [{ insert: '\n' }] },
+              ];
+              latest.current = next;
+              ws.saveDocument(doc.id, { content: medleyContent(next) });
+              setPage(next.length - 1);
+            }}
+          >
+            <Plus size={17} /> Add song
+          </button>
+        </nav>
+      </div>
+      <SongEditor
+        key={song.id}
+        doc={{ ...doc, title: song.name, content: song.content }}
+        onBack={onBack}
+        onDelete={onDelete}
+        medleyName={doc.title}
+        saveDocument={(_, changes) =>
+          update({
+            ...(changes.title !== undefined ? { name: changes.title } : {}),
+            ...(changes.content ? { content: changes.content } : {}),
+          })
+        }
+        songKey={song.key}
+        onKeyChange={(key) => update({ key })}
+      />
+    </div>
+  );
+}
+function SongEditor({
   doc,
   onBack,
   onDelete,
+  saveDocument,
+  songKey,
+  onKeyChange,
+  medleyName,
 }: {
   doc: Doc;
   onBack: () => void;
   onDelete: () => void;
+  saveDocument?: (id: string, changes: { title?: string; content?: Op[] }) => void;
+  songKey?: string;
+  onKeyChange?: (key: string) => void;
+  medleyName?: string;
 }) {
   const ws = useWorkspace(),
     host = useRef<HTMLDivElement>(null),
     toolbar = useRef<HTMLDivElement>(null),
     quill = useRef<Quill | null>(null),
     file = useRef<HTMLInputElement>(null);
-  const onChange = useRef(ws.saveDocument);
-  onChange.current = ws.saveDocument;
+  const save = saveDocument ?? ws.saveDocument;
+  const onChange = useRef(save);
+  onChange.current = save;
   const [paste, setPaste] = useState(false),
     [pasteText, setPasteText] = useState(''),
-    [error, setError] = useState(''),
+    [error, setError] = useTimedMessage(),
     [uploading, setUploading] = useState(false),
     [deleting, setDeleting] = useState(false);
   useEffect(() => {
@@ -111,11 +229,6 @@ export function Editor({
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [ws.retry]);
-  useEffect(() => {
-    if (!error) return;
-    const timer = setTimeout(() => setError(''), 6000);
-    return () => clearTimeout(timer);
-  }, [error]);
   function insertText(q: Quill, text: string) {
     const range = q.getSelection(true) ?? { index: q.getLength() - 1, length: 0 };
     const delta = new Delta()
@@ -158,12 +271,17 @@ export function Editor({
         <button
           className="button secondary"
           disabled={uploading}
+          aria-label={uploading ? 'Uploading image' : 'Image'}
           onClick={() => file.current?.click()}
         >
           <ImagePlus size={17} />
           <span>{uploading ? 'Uploading…' : 'Image'}</span>
         </button>
-        <button className="button secondary" onClick={() => setPaste(true)}>
+        <button
+          className="button secondary"
+          aria-label="Smart Paste"
+          onClick={() => setPaste(true)}
+        >
           <ClipboardPaste size={17} />
           <span>Smart Paste</span>
         </button>
@@ -173,7 +291,7 @@ export function Editor({
         <button
           className="icon-button"
           onClick={() => setDeleting(true)}
-          aria-label="Delete document"
+          aria-label={onKeyChange ? 'Delete medley' : 'Delete document'}
         >
           <Trash2 size={18} />
         </button>
@@ -259,15 +377,30 @@ export function Editor({
       </div>
       <div className="paper-scroll">
         <div className="paper">
+          {onKeyChange && <label htmlFor="medley-song-name">Name</label>}
           <input
+            id={onKeyChange ? 'medley-song-name' : undefined}
             className="document-title"
-            aria-label="Document title"
+            aria-label={onKeyChange ? 'Song name' : 'Document title'}
             value={doc.title}
-            onChange={(e) => ws.saveDocument(doc.id, { title: e.target.value })}
+            onChange={(e) => save(doc.id, { title: e.target.value })}
             onBlur={() => {
-              if (!doc.title.trim()) ws.saveDocument(doc.id, { title: 'Untitled' });
+              if (!doc.title.trim()) save(doc.id, { title: 'Untitled' });
             }}
           />
+          <label className="medley-key">
+            Key
+            <input
+              aria-label="Song key"
+              placeholder="e.g. C, G, Am"
+              value={onKeyChange ? songKey : readSongKey(doc.content)}
+              onChange={(e) =>
+                onKeyChange
+                  ? onKeyChange(e.target.value)
+                  : ws.saveDocument(doc.id, { key: e.target.value })
+              }
+            />
+          </label>
           <div ref={host} className="quill-host" />
         </div>
       </div>
@@ -308,16 +441,20 @@ export function Editor({
         </Modal>
       )}
       {deleting && (
-        <Modal title="Delete document?" onClose={() => setDeleting(false)}>
+        <Modal
+          title={onKeyChange ? 'Delete entire medley?' : 'Delete document?'}
+          onClose={() => setDeleting(false)}
+        >
           <p>
-            “{doc.title}” will also be removed from templates and sessions. This cannot be undone.
+            “{medleyName ?? doc.title}” will also be removed from templates and sessions. This
+            cannot be undone.
           </p>
           <div className="modal-actions">
             <button className="button secondary" onClick={() => setDeleting(false)}>
               Cancel
             </button>
             <button className="button danger" onClick={onDelete}>
-              Delete document
+              {onKeyChange ? 'Delete entire medley' : 'Delete document'}
             </button>
           </div>
         </Modal>
