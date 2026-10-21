@@ -136,7 +136,7 @@ export function SessionDetail({
   const pageIndex = pages.findIndex(
     (page) => page.documentId === doc?.id && page.page === currentPage,
   );
-  const currentKey = pages[pageIndex]?.key ?? '';
+  const currentKey = pages[pageIndex]?.key.trim() ?? '';
   const nextSong = pages[pageIndex + 1];
   function navigateSong(direction: -1 | 1) {
     const target = pages[pageIndex + direction];
@@ -347,14 +347,23 @@ export function SessionDetail({
               <ArrowLeft size={18} />
             </button>
             <div className="song-navigation-center" aria-live="polite">
-              {doc && <strong className="song-key-display">Key: {currentKey || 'Not set'}</strong>}
+              {currentKey && (
+                <strong className="song-key-display" aria-label={`Song key: ${currentKey}`}>
+                  {currentKey}
+                </strong>
+              )}
               <span>{pages.length ? `${pageIndex + 1} / ${pages.length}` : '0 songs'}</span>
               {doc && (
                 <div className="live-next-song" aria-live="polite">
                   <span>{nextSong ? 'UP NEXT' : 'SETLIST'}</span>
                   <strong>{nextSong ? nextSong.title || 'Untitled' : 'Last song'}</strong>
-                  {nextSong && (
-                    <small className="up-next-key">Key: {nextSong.key || 'Not set'}</small>
+                  {nextSong?.key.trim() && (
+                    <small
+                      className="up-next-key"
+                      aria-label={`Up next key: ${nextSong.key.trim()}`}
+                    >
+                      {nextSong.key.trim()}
+                    </small>
                   )}
                 </div>
               )}
@@ -364,7 +373,7 @@ export function SessionDetail({
               aria-label="Next"
               title={
                 nextSong
-                  ? `Next: ${nextSong.title} · Key: ${nextSong.key || 'Not set'}`
+                  ? `Next: ${nextSong.title}${nextSong.key.trim() ? ` · ${nextSong.key.trim()}` : ''}`
                   : 'Last song'
               }
               disabled={pageIndex < 0 || pageIndex >= pages.length - 1}

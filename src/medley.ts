@@ -39,17 +39,15 @@ export function medleyContent(songs: MedleySong[]): Op[] {
 
 export function medleyPages(doc: Doc): Doc[] {
   if (doc.song_type !== 'medley') {
-    const key = readSongKey(doc.content);
-    return key
-      ? [{ ...doc, artist: [`Key: ${key}`, doc.artist].filter(Boolean).join(' · ') }]
-      : [doc];
+    const key = readSongKey(doc.content).trim();
+    return key ? [{ ...doc, artist: [key, doc.artist].filter(Boolean).join(' · ') }] : [doc];
   }
   return medleySongs(doc).map((song, index) => ({
     ...doc,
     id: `${doc.id}/${song.id}`,
     song_type: 'song',
     title: `${doc.title} — ${index + 1}. ${song.name || 'Untitled song'}`,
-    artist: [song.key ? `Key: ${song.key}` : '', doc.artist].filter(Boolean).join(' · '),
+    artist: [song.key.trim(), doc.artist].filter(Boolean).join(' · '),
     content: song.content,
   }));
 }

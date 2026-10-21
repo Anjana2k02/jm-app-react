@@ -48,9 +48,9 @@ test('ordinary song keys survive lyric edits and update in the top session navig
     'Edited lyrics',
   );
   await page.goto('/#session/practice');
-  await expect(page.locator('.song-navigation .song-key-display')).toHaveText('Key: F#m');
+  await expect(page.locator('.song-navigation .song-key-display')).toHaveText('F#m');
   await page.getByRole('button', { name: 'Live Mode', exact: true }).click();
   await expect(page.locator('.song-navigation .song-key-display')).toBeVisible();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
-  await expect(page.locator('.song-navigation .song-key-display')).toHaveText('Key: Not set');
+  await expect(page.locator('.song-navigation .song-key-display')).toHaveCount(0);
 });

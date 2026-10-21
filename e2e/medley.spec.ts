@@ -70,12 +70,12 @@ for (const mobile of [false, true]) {
     await page.reload();
     if (mobile) await expect(page.getByRole('button', { name: 'Expand song panel' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'First song', exact: true })).toBeVisible();
-    await expect(page.locator('.song-navigation .song-key-display')).toHaveText('Key: C');
+    await expect(page.locator('.song-navigation .song-key-display')).toHaveText('C');
     await expect(page.locator('.rich-viewer')).toContainText('First song lyrics');
     await page.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Second song', exact: true })).toBeVisible();
-    await expect(page.getByText('Key: Am', { exact: true })).toBeVisible();
-    await expect(page.locator('.song-navigation .song-key-display')).toHaveText('Key: Am');
+    await expect(page.getByText('Am', { exact: true })).toBeVisible();
+    await expect(page.locator('.song-navigation .song-key-display')).toHaveText('Am');
     await expect(page.locator('.rich-viewer')).toContainText('Second song lyrics');
     await expect(page.locator('.rich-viewer')).not.toContainText('First song lyrics');
     if (!mobile) {
@@ -90,8 +90,7 @@ for (const mobile of [false, true]) {
       expect(pdf.match(/\/Type \/Page\b/g)).toHaveLength(3);
       expect(pdf).toContain('First song lyrics');
       expect(pdf).toContain('Second song lyrics');
-      expect(pdf).toContain('Key: C');
-      expect(pdf).toContain('Key: Am');
+      expect(pdf).not.toContain('Key:');
     }
   });
 }

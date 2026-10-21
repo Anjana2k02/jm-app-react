@@ -34,7 +34,7 @@ describe('medley song pages', () => {
     const pages = medleyPages(doc);
     expect(pages).toHaveLength(3);
     expect(pages[1].title).toContain('Second');
-    expect(pages[1].artist).toBe('Key: Am');
+    expect(pages[1].artist).toBe('Am');
     expect(pages[0].content).toEqual(original.content);
     expect(pages[1].content).toEqual(songs[1].content);
   });
