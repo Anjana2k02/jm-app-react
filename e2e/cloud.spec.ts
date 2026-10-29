@@ -61,6 +61,7 @@ test('cloud authentication, failed save recovery after reload, and sign out', as
       if (url.pathname.endsWith('/documents')) {
         const rows = req.postDataJSON();
         for (const row of rows) {
+          expect(['song', 'medley', 'artist_backing']).toContain(row.song_type);
           const i = docs.findIndex((d) => d.id === row.id);
           if (i >= 0) docs[i] = row;
           else docs.push(row);
@@ -76,7 +77,9 @@ test('cloud authentication, failed save recovery after reload, and sign out', as
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByText('Cloud workspace', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'New song', exact: true }).click();
+  await page.getByText('Artist', { exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill('Cloud Song');
+  await page.getByLabel('Artist name', { exact: true }).fill('Test Artist');
   await page.getByRole('button', { name: 'Create', exact: true }).click();
   await page.getByRole('textbox', { name: 'Document content' }).fill('Never lose this lyric');
   await expect(page.getByRole('alert')).toContainText('row-level security policy');
@@ -87,6 +90,19 @@ test('cloud authentication, failed save recovery after reload, and sign out', as
   await expect(page.getByRole('alert')).toContainText('row-level security policy');
   await expect(page.getByRole('alert')).toBeHidden({ timeout: 4000 });
   await expect(page.getByRole('status')).toHaveText('Save failed');
+  // Simulate an unsynced draft written by the older app before reloading.
+  await page.evaluate(() => {
+    const key = 'jammer-draft-11111111-1111-4111-8111-111111111111';
+    const jobs = JSON.parse(localStorage.getItem(key)!);
+    for (const job of jobs) {
+      for (const op of job.operations) {
+        if (op.action === 'upsert' && op.table === 'documents') {
+          for (const row of op.rows) row.song_type = 'artist';
+        }
+      }
+    }
+    localStorage.setItem(key, JSON.stringify(jobs));
+  });
   await page.reload();
   await expect(page.getByRole('textbox', { name: 'Document content' })).toContainText(
     'Never lose this lyric',
@@ -97,6 +113,8 @@ test('cloud authentication, failed save recovery after reload, and sign out', as
   await expect(page.getByRole('status')).toHaveText('✓ Saved');
   expect(docs).toHaveLength(1);
   expect(docs[0].user_id).toBe(user.id);
+  expect(docs[0].song_type).toBe('artist_backing');
+  expect(docs[0].artist).toBe('Test Artist');
   expect(JSON.stringify(docs[0].content)).toContain('Never lose this lyric');
   await expect
     .poll(() =>

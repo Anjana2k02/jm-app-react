@@ -1,4 +1,5 @@
 import type { Data } from './model';
+import { normalizeDocumentType } from './model';
 export type Operation =
   | { action: 'upsert'; table: keyof Data; rows: Record<string, unknown>[] }
   | { action: 'remove'; table: keyof Data; column: string; id: string; documentId?: string };
@@ -6,7 +7,7 @@ export type Job = { key: string; operations: Operation[] };
 export const write = (table: keyof Data, rows: Record<string, unknown>[]): Operation => ({
   action: 'upsert',
   table,
-  rows,
+  rows: table === 'documents' ? rows.map(normalizeDocumentType) : rows,
 });
 export const erase = (
   table: keyof Data,

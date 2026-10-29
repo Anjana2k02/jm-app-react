@@ -2,7 +2,11 @@ export type Op = {
   insert?: string | Record<string, unknown>;
   attributes?: Record<string, unknown>;
 };
-export type SongType = 'song' | 'medley' | 'artist';
+export type SongType = 'song' | 'medley' | 'artist_backing';
+// Older React versions stored `artist`, which the shared database does not accept.
+export function normalizeDocumentType<T extends { song_type?: unknown }>(doc: T): T {
+  return doc.song_type === 'artist' ? { ...doc, song_type: 'artist_backing' } : doc;
+}
 export type Doc = {
   id: string;
   user_id: string;

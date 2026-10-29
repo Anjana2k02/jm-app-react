@@ -102,10 +102,16 @@ function useWorkspaceState(userId: string, canManageSessionSongs: boolean) {
             throw new Error(
               'Unsynced changes could not be read. Back up your browser storage before continuing.',
             );
-          queue.current = jobs;
+          // Recover pending saves from versions that used the invalid `artist` type.
+          queue.current = jobs.map((job) => ({
+            ...job,
+            operations: job.operations.map((op) =>
+              op.action === 'upsert' ? write(op.table, op.rows) : op,
+            ),
+          }));
           loaded = replay(
             loaded,
-            jobs.flatMap((j) => j.operations),
+            queue.current.flatMap((j) => j.operations),
           );
           setPending(jobs.length);
         }

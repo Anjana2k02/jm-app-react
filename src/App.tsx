@@ -761,7 +761,7 @@ function Workspace({
                         <option value="all">All</option>
                         <option value="song">Songs</option>
                         <option value="medley">Medleys</option>
-                        <option value="artist">Artist</option>
+                        <option value="artist_backing">Artist</option>
                       </select>
                     </div>
                     <div className="search-field">
@@ -1110,7 +1110,7 @@ function Workspace({
                 ws.saveTemplate(editTemplate, name);
                 setEditTemplate(null);
               } else if (modal === 'document') {
-                if (songType === 'artist' && !artistName.trim()) return;
+                if (songType === 'artist_backing' && !artistName.trim()) return;
                 if (newSongSessionId && !ws.canManageSessionSongs) return;
                 const doc = ws.createDocument(name, songType, artistName);
                 if (newSongSessionId) {
@@ -1189,7 +1189,7 @@ function Workspace({
                   </div>
                 ) : null;
               })()}
-            {modal === 'document' && !editTemplate && songType === 'artist' && (
+            {modal === 'document' && !editTemplate && songType === 'artist_backing' && (
               <label>
                 Artist name
                 <input
@@ -1225,7 +1225,7 @@ function Workspace({
                   !name.trim() ||
                   (modal === 'document' &&
                     !editTemplate &&
-                    songType === 'artist' &&
+                    songType === 'artist_backing' &&
                     !artistName.trim())
                 }
               >

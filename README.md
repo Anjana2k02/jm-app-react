@@ -39,6 +39,8 @@ For a new project, run the parent repository's [base schema](../docs/supabase_sc
 
 Sign-up uses the project's email-confirmation policy. Where confirmation is enabled, confirm the email before signing in. Image uploads accept PNG, JPEG, GIF, and WebP up to 5 MB.
 
+If saving a shared song fails with `new row violates row-level security policy for table "documents"`, run [supabase/documents-shared-access.sql](supabase/documents-shared-access.sql) in the same Supabase project's SQL editor, then click **Retry** in the app (or the editor's Save icon). The original base schema is owner-only, whereas this app provides a shared library. The repair explicitly lets all signed-in accounts read, create, and edit documents. It keeps RLS enabled and preserves document delete rules and session admin rules. The Realtime publication script does not grant document save permissions. Unsynced edits remain in browser storage; do not clear site data to resolve a permission error. If the repair does not resolve the error, inspect its policy-list output for custom restrictive policies and confirm the app is signed into the same project. This script is not automatically applied to the hosted database.
+
 The [storage setup script](supabase/storage.sql) creates a missing `doc-images` bucket and owner-scoped insert/select policies. Run it in your project's SQL editor if uploads fail because the bucket or policies are missing. It does not change an existing bucket's settings. A public bucket is required for the image URLs used by both clients.
 
 ## Deploy to Vercel

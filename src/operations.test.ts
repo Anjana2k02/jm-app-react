@@ -1,6 +1,22 @@
 import { it, expect } from 'vitest';
 import { emptyData } from './model';
 import { replay, write, erase } from './operations';
+it('converts legacy artist saves without changing their content or other document types', () => {
+  const rows = ['artist', 'artist_backing', 'song', 'medley', null].map((song_type) => ({
+    id: String(song_type),
+    song_type,
+    content: [{ insert: 'Unsynced lyrics\n' }],
+  }));
+  const operation = write('documents', rows);
+  expect(operation).toMatchObject({
+    rows: rows.map((row, index) => ({
+      ...row,
+      song_type: index === 0 ? 'artist_backing' : row.song_type,
+    })),
+  });
+  expect(rows[0].song_type).toBe('artist');
+  expect(write('sessions', rows)).toMatchObject({ rows });
+});
 it('recovers only queued changes, preserving unrelated cloud rows', () => {
   const cloud = emptyData();
   cloud.documents = [

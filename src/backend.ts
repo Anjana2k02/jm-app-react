@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Data } from './model';
-import { emptyData } from './model';
+import { emptyData, normalizeDocumentType } from './model';
 import { validateSupabaseConfig } from './config';
 const url = import.meta.env.VITE_SUPABASE_URL,
   key = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -31,7 +31,7 @@ export async function loadData(): Promise<Data> {
         throw new Error(
           'The local workspace could not be read. Export your browser data before resetting it.',
         );
-    return parsed;
+    return { ...parsed, documents: parsed.documents.map(normalizeDocumentType) };
   }
   const tables = Object.keys(emptyData()) as (keyof Data)[];
   const results = await Promise.all(tables.map((t) => supabase!.from(t).select('*')));

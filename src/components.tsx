@@ -198,7 +198,7 @@ export const SONG_TYPES: {
 }[] = [
   { value: 'song', label: 'Song', icon: Music2, color: 'indigo' },
   { value: 'medley', label: 'Medley', icon: ListMusic, color: 'violet' },
-  { value: 'artist', label: 'Artist', icon: MicVocal, color: 'teal' },
+  { value: 'artist_backing', label: 'Artist', icon: MicVocal, color: 'teal' },
 ];
 export const songTypeMeta = (type?: string | null) =>
   SONG_TYPES.find((t) => t.value === type) ?? SONG_TYPES[0];
